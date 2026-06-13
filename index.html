@@ -8,6 +8,24 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<!-- Firebase v10 compat (CDN — no build step needed) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyAHhjY6M0Jr_TDAJ-K2r8npoXdvCJd4QT0",
+  authDomain:"skylrss.firebaseapp.com",
+  projectId:"skylrss",
+  storageBucket:"skylrss.firebasestorage.app",
+  messagingSenderId:"47033639593",
+  appId:"1:47033639593:web:1c9cb29bf68b583429ffb8"
+});
+const _fdb=firebase.firestore();
+const _fst=firebase.storage();
+// offline persistence — works even with no internet
+_fdb.enablePersistence().catch(()=>{});
+</script>
 <style>
 :root{
   --bg:#0E0716; --bg-2:#150B22; --surface:#1C1230; --surface-2:#251739;
@@ -277,7 +295,7 @@ table.pc .c-inv{font-family:'JetBrains Mono',monospace;color:var(--muted-2);font
     </div>
     <div class="spacer"></div>
     <div class="branch-pill"><span class="sync-dot"></span> Branch · <b>Unaizah</b></div>
-    <div class="branch-pill" id="storagePill">Local vault</div>
+    <div class="branch-pill" id="storagePill"><span id="syncIco" style="font-size:.75rem">☁</span> <span id="syncLbl">Connecting…</span></div>
   </div>
   <nav class="tabs" id="tabs">
     <button class="tab active" data-view="dash">⬡ Dashboard</button>
@@ -417,35 +435,104 @@ table.pc .c-inv{font-family:'JetBrains Mono',monospace;color:var(--muted-2);font
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 /* ============================================================
-   STORAGE LAYER  (IndexedDB now · Firebase-ready seam)
-   Swap the four async methods below for Firestore + Storage
-   and the rest of the app keeps working unchanged.
+   STORAGE LAYER — Firebase Firestore + Storage
+   PDFs go to Firebase Storage (unaizah/invoices/<id>.pdf)
+   Metadata + petty cash + settings go to Firestore
+   Offline persistence is enabled — works without internet
    ============================================================ */
-const DB = (()=>{
-  let db;
-  const open=()=>new Promise((res,rej)=>{
-    const r=indexedDB.open('noir_vault',2);
-    r.onupgradeneeded=e=>{const d=e.target.result;
-      if(!d.objectStoreNames.contains('invoices'))d.createObjectStore('invoices',{keyPath:'id'});
-      if(!d.objectStoreNames.contains('petty'))d.createObjectStore('petty',{keyPath:'id'});
-      if(!d.objectStoreNames.contains('settings'))d.createObjectStore('settings',{keyPath:'k'});
-    };
-    r.onsuccess=e=>{db=e.target.result;res()};r.onerror=e=>rej(e);
-  });
-  const tx=(store,mode)=>db.transaction(store,mode).objectStore(store);
-  const all=store=>new Promise((res)=>{const o=tx(store,'readonly').getAll();o.onsuccess=()=>res(o.result||[])});
-  const put=(store,v)=>new Promise((res)=>{tx(store,'readwrite').put(v).onsuccess=()=>res()});
-  const del=(store,id)=>new Promise((res)=>{tx(store,'readwrite').delete(id).onsuccess=()=>res()});
-  const get=(store,id)=>new Promise((res)=>{const o=tx(store,'readonly').get(id);o.onsuccess=()=>res(o.result)});
+function setSyncStatus(ok,msg){
+  const lbl=document.getElementById('syncLbl'),ic=document.getElementById('syncIco');
+  if(!lbl)return;
+  lbl.textContent=msg;
+  ic.textContent=ok?'☁':'⚠';
+  ic.style.color=ok?'var(--green)':'var(--amber)';
+}
+
+const DB=(()=>{
+  /* ---------- helpers ---------- */
+  const col=(name)=>_fdb.collection(name);
+  const docRef=(coll,id)=>_fdb.collection(coll).doc(id);
+
+  /* open — no-op for Firebase (SDK inits in <head>) */
+  const open=async()=>{
+    try{
+      await _fdb.collection('settings').limit(1).get();
+      setSyncStatus(true,'Firebase · live');
+    }catch(e){setSyncStatus(false,'Firebase · offline');}
+    // listen for real-time updates on invoices
+    _fdb.collection('invoices').onSnapshot(snap=>{
+      INVOICES=snap.docs.map(d=>({...d.data(),id:d.id}));
+      if(typeof renderAll==='function')renderAll();
+      setSyncStatus(true,'Firebase · live');
+    },()=>setSyncStatus(false,'Offline mode'));
+    _fdb.collection('petty').onSnapshot(snap=>{
+      PETTY=snap.docs.map(d=>({...d.data(),id:d.id}));
+      if(typeof renderPetty==='function')renderPetty();
+    });
+  };
+
+  /* all — get every document in a Firestore collection */
+  const all=async(store)=>{
+    if(store==='settings')return []; // settings fetched individually
+    const snap=await col(store).get();
+    return snap.docs.map(d=>({...d.data(),id:d.id}));
+  };
+
+  /* put — upsert a doc; for invoices, also upload blob to Storage */
+  const put=async(store,v)=>{
+    const data={...v};
+    if(store==='invoices' && v.blob instanceof File){
+      setSyncStatus(false,'Uploading PDF…');
+      try{
+        const path=`unaizah/invoices/${v.id}.pdf`;
+        const ref=_fst.ref(path);
+        await ref.put(v.blob,{contentType:'application/pdf',customMetadata:{fileName:v.fileName,supplier:v.supplier}});
+        data.storagePath=path;
+        data.downloadURL=await ref.getDownloadURL();
+        setSyncStatus(true,'PDF uploaded ✓');
+      }catch(e){setSyncStatus(false,'Upload failed');console.error(e);}
+      delete data.blob; // never store File object in Firestore
+    }
+    if(store==='settings'){
+      await docRef('settings',v.k).set(v);
+    }else{
+      await docRef(store,v.id).set(data);
+    }
+    return data;
+  };
+
+  /* del — delete from Firestore (and Storage for invoices) */
+  const del=async(store,id)=>{
+    if(store==='invoices'){
+      try{
+        const snap=await docRef('invoices',id).get();
+        const path=snap.data()?.storagePath;
+        if(path)await _fst.ref(path).delete();
+      }catch(e){}
+    }
+    await docRef(store,id).delete();
+  };
+
+  /* get — fetch a single doc (used for settings & openPdf) */
+  const get=async(store,id)=>{
+    const key = store==='settings'?id:id;
+    const ref = store==='settings'?docRef('settings',id):docRef(store,id);
+    const snap=await ref.get();
+    if(!snap.exists)return null;
+    const data={...snap.data(),id:snap.id};
+    /* for invoices: reconstruct a fake blob-URL from Storage download URL */
+    if(store==='invoices' && data.downloadURL){
+      // fetch the file so openPdf can createObjectURL
+      try{
+        const resp=await fetch(data.downloadURL);
+        const blob=await resp.blob();
+        data.blob=new File([blob],data.fileName,{type:'application/pdf'});
+      }catch(e){}
+    }
+    return data;
+  };
+
   return {open,all,put,del,get};
-  /* ---- FIREBASE ADAPTER (uncomment & fill config to go cloud) ----
-  // import { initializeApp } from 'firebase/app';
-  // import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc } from 'firebase/firestore';
-  // import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-  // const firebaseConfig = { apiKey:'…', authDomain:'…', projectId:'…', storageBucket:'…' };
-  // Store metadata in Firestore (invoices / petty / settings collections);
-  // store the PDF blob in Firebase Storage and keep its download URL in the
-  // invoice record instead of the local blob. Keep these method names identical. */
 })();
 
 /* ---------- state ---------- */
@@ -599,7 +686,7 @@ function renderDash(){
     ${kpi('Documents filed',total,'gold','across all suppliers')}
     ${kpi('Active suppliers',supSet.size,'orchid','with at least one file')}
     ${kpi('This month',thisMonth,'','filed in '+MONTHS[cm]+' '+cy)}
-    ${kpi('Vault size',fmtSize(bytes),'','stored locally')}`;
+    ${kpi('Vault size',fmtSize(bytes),'','Firebase Storage')}`;
   // per-month bars (current + last year span)
   const byMonth={};
   INVOICES.forEach(i=>{const key=`${i.year}-${i.monthIndex}`;byMonth[key]=(byMonth[key]||0)+1});
@@ -696,7 +783,7 @@ function renderTree(){
   area.querySelectorAll('[data-view-pdf]').forEach(b=>b.onclick=e=>{e.stopPropagation();openPdf(b.dataset.viewPdf)});
   area.querySelectorAll('[data-del]').forEach(b=>b.onclick=async e=>{e.stopPropagation();
     if(!confirm('Delete this document from the vault?'))return;
-    await DB.del('invoices',b.dataset.del);INVOICES=INVOICES.filter(x=>x.id!==b.dataset.del);toast('Document deleted');renderAll();});
+    await DB.del('invoices',b.dataset.del);toast('Document deleted — removed from Firebase');});
 }
 function monthsSpan(items){
   const ms=[...new Set(items.map(i=>`${MONTHS[i.monthIndex]} ${String(i.year).slice(2)}`))];
@@ -704,7 +791,11 @@ function monthsSpan(items){
 }
 async function openPdf(id){
   const rec=await DB.get('invoices',id);if(!rec)return;
-  const url=URL.createObjectURL(rec.blob);
+  // If blob fetched from Storage, create object URL; otherwise use direct downloadURL
+  let url;
+  if(rec.blob){url=URL.createObjectURL(rec.blob);}
+  else if(rec.downloadURL){url=rec.downloadURL;}
+  else{toast('PDF not available',true);return;}
   document.getElementById('pdfName').textContent=rec.fileName;
   document.getElementById('pdfFrame').src=url;
   document.getElementById('pdfOverlay').classList.add('show');
@@ -751,7 +842,7 @@ function renderPetty(){
   body.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openExp(b.dataset.edit));
   body.querySelectorAll('[data-delp]').forEach(b=>b.onclick=async()=>{
     if(!confirm('Delete this expense?'))return;
-    await DB.del('petty',b.dataset.delp);PETTY=PETTY.filter(x=>x.id!==b.dataset.delp);toast('Expense removed');renderPetty();});
+    await DB.del('petty',b.dataset.delp);toast('Expense removed from Firebase');});
 }
 ['pcSearch','pcMonth'].forEach(id=>document.getElementById(id).addEventListener('input',renderPetty));
 const floatInput=document.getElementById('floatInput');
@@ -825,21 +916,37 @@ function renderAll(){renderDash();refreshFilters();renderTree();renderPetty()}
    BOOT
    ============================================================ */
 (async function init(){
+  // DB.open() registers Firestore real-time listeners (invoices + petty)
+  // Those listeners will push data and call renderAll() automatically.
+  // Here we just: check seeded flag, seed petty cash on first run, set float.
   await DB.open();
-  INVOICES=await DB.all('invoices');
-  PETTY=await DB.all('petty');
-  const fset=await DB.get('settings','float');
-  const seeded=await DB.get('settings','seeded');
-  if(!seeded){
-    // first run — seed the real June petty-cash statement
-    for(const p of PETTY_SEED){const rec={id:'pc_seed_'+Math.random().toString(36).slice(2,8),...p};PETTY.push(rec);await DB.put('petty',rec);}
-    FLOAT=5000;await DB.put('settings',{k:'float',v:5000});await DB.put('settings',{k:'seeded',v:1});
-    toast('Loaded your June petty-cash statement');
-  }else{
-    FLOAT=fset?fset.v:5000;
+  // Brief initial render while listeners connect
+  renderAll();
+  try{
+    const fset=await DB.get('settings','float');
+    const seeded=await DB.get('settings','seeded');
+    if(!seeded){
+      // First run — write the June petty-cash statement to Firestore
+      const batch=_fdb.batch();
+      for(const p of PETTY_SEED){
+        const id='pc_seed_'+Math.random().toString(36).slice(2,8);
+        batch.set(_fdb.collection('petty').doc(id),{...p,id});
+      }
+      await batch.commit();
+      await DB.put('settings',{k:'float',v:5000});
+      await DB.put('settings',{k:'seeded',v:1});
+      FLOAT=5000;
+      toast('Petty cash statement loaded into Firebase ✓');
+    }else{
+      FLOAT=fset&&fset.v!=null?fset.v:5000;
+    }
+  }catch(e){
+    // offline — use local defaults
+    FLOAT=5000;
+    setSyncStatus(false,'Offline — changes queued');
   }
   floatInput.value=FLOAT;
-  renderAll();
+  renderPetty();
 })();
 
 /* ---- seeded petty cash data (your uploaded statement) ---- */
