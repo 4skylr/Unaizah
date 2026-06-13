@@ -13,6 +13,8 @@
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <!-- SheetJS for Excel export -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- JSZip for bulk ZIP import -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <!-- Firebase v10 compat -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -331,6 +333,31 @@ table.pc .c-inv{font-family:'JetBrains Mono',monospace;color:var(--muted-2);font
     <h2 class="section">Invoices &amp; Suppliers</h2>
     <p class="section-sub">Drop any PDF — the engine reads the ZATCA QR, OCR fallback, and files it automatically.</p>
 
+    <!-- Bulk ZIP import (one-time migration) -->
+    <details class="panel" id="zipPanel" style="padding:0">
+      <summary style="padding:16px 20px;cursor:pointer;font-weight:600;font-size:.9rem;display:flex;align-items:center;gap:9px;list-style:none">
+        <span style="color:var(--gold)">⤓</span> Bulk import — upload a branch ZIP to fill the vault
+        <span class="hint" style="margin-left:auto">one-time setup</span>
+      </summary>
+      <div style="padding:0 20px 20px">
+        <p class="hint" style="margin:0 0 14px">Upload your <b>Unayazh.zip</b> or <b>Maithanb.zip</b>. The folder path (Supplier / Year / Month / Type) is read automatically, every PDF is QR-scanned, and all files are uploaded to <b>this branch's</b> Firebase. Make sure the right branch is selected above first.</p>
+        <div class="drop" id="zipDrop" style="padding:24px 18px">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:38px;height:38px"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-7l-2-2H5a2 2 0 00-2 2z"/></svg>
+          <div class="big" style="font-size:1.1rem">Drop the branch ZIP here</div>
+          <div class="sm">or click to browse — processes every PDF inside</div>
+          <input type="file" id="zipInput" accept=".zip,application/zip" hidden />
+        </div>
+        <div id="zipProgress" style="display:none;margin-top:16px">
+          <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:6px">
+            <span id="zipStatus" style="color:var(--muted)">Preparing…</span>
+            <span id="zipPct" class="mono" style="color:var(--gold-soft)">0%</span>
+          </div>
+          <div class="progress"><div id="zipBar" style="width:0%;background:linear-gradient(90deg,var(--violet),var(--orchid))"></div></div>
+          <div id="zipLog" style="margin-top:12px;max-height:200px;overflow:auto;font-size:.72rem;font-family:JetBrains Mono,monospace;color:var(--muted-2);background:var(--bg-2);border:1px solid var(--line-soft);border-radius:8px;padding:10px"></div>
+        </div>
+      </div>
+    </details>
+
     <div class="panel">
       <div class="drop" id="drop">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4m0 0l-4 4m4-4l4 4"/><path d="M4 14v4a2 2 0 002 2h12a2 2 0 002-2v-4"/></svg>
@@ -360,8 +387,8 @@ table.pc .c-inv{font-family:'JetBrains Mono',monospace;color:var(--muted-2);font
 
   <!-- PETTY CASH -->
   <section class="view" id="view-petty">
-    <h2 class="section">Petty Cash · Unaizah</h2>
-    <p class="section-sub">Drop a receipt PDF — the engine reads vendor &amp; amount and adds it to the ledger. Petty cash is Unaizah-only.</p>
+    <h2 class="section" id="pcTitle">Petty Cash · Unaizah</h2>
+    <p class="section-sub">Drop a receipt PDF — the engine reads vendor &amp; amount and adds it to the ledger.</p>
 
     <div class="pc-balance">
       <div class="pc-card float">
@@ -524,15 +551,11 @@ const DB={
       renderAll();
       setSyncStatus(true,'Firebase · live');
     },e=>{console.error(e);setSyncStatus(false,'Read failed')});
-    // Petty cash only for Unaizah
-    if(BRANCH==='unaizah'){
-      _unsubPetty=_fdb.collection(this.collName('petty')).onSnapshot(snap=>{
-        PETTY=snap.docs.map(d=>({...d.data(),id:d.id}));
-        renderPetty();
-      });
-    }else{
-      PETTY=[]; renderPetty();
-    }
+    // Petty cash for every branch (each branch keeps its own ledger)
+    _unsubPetty=_fdb.collection(this.collName('petty')).onSnapshot(snap=>{
+      PETTY=snap.docs.map(d=>({...d.data(),id:d.id}));
+      renderPetty();
+    });
   },
   all: async function(store){
     const snap=await _fdb.collection(this.collName(store)).get();
@@ -554,7 +577,7 @@ const DB={
     }
     if(store==='petty' && v.blob instanceof File){
       try{
-        const path=`unaizah/petty/${v.id}.pdf`;
+        const path=`${BRANCH}/petty/${v.id}.pdf`;
         const ref=_fst.ref(path);
         await ref.put(v.blob,{contentType:'application/pdf'});
         data.storagePath=path;
@@ -836,7 +859,6 @@ pcDrop.addEventListener('drop',e=>handlePcFiles(e.dataTransfer.files));
 pcFileInput.onchange=e=>handlePcFiles(e.target.files);
 
 async function handlePcFiles(list){
-  if(BRANCH!=='unaizah'){toast('Petty cash is Unaizah-only',true);return}
   const files=[...list].filter(f=>f.type==='application/pdf'||f.name.toLowerCase().endsWith('.pdf'));
   if(!files.length){toast('Only PDF files are supported',true);return}
   for(const f of files){
@@ -882,7 +904,7 @@ function buildPcReviewCard(card,file,r){
     const cost=+g('cost');
     if(!g('date')||!g('vendor')||isNaN(cost)){toast('Date, vendor and cost are required',true);return}
     const rec={id:'pc_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
-      branch:'unaizah', date:g('date'), cost, vendor:g('vendor'),
+      branch:BRANCH, date:g('date'), cost, vendor:g('vendor'),
       invoice:g('invoice'), purpose:g('purpose'),
       vatNumber:r.vatNumber||null, blob:file};
     await DB.put('petty',rec);
@@ -1074,15 +1096,7 @@ function getFilteredPetty(){
   }).sort((a,b)=>a.date.localeCompare(b.date));
 }
 function renderPetty(){
-  const pcTab=document.querySelector('[data-view="petty"]');
-  if(pcTab) pcTab.classList.toggle('disabled', BRANCH!=='unaizah');
-  if(BRANCH!=='unaizah'){
-    document.getElementById('pcBody').innerHTML=`<tr><td colspan="6"><div class="empty"><h4>Petty cash is Unaizah-only</h4><p>Switch to the Unaizah branch to use this section.</p></div></td></tr>`;
-    document.getElementById('pcSpent').innerHTML='— <small>SAR</small>';
-    document.getElementById('pcBalance').innerHTML='— <small>SAR</small>';
-    document.getElementById('pcCount').textContent='—';
-    return;
-  }
+  document.getElementById('pcTitle').textContent=`Petty Cash · ${branchCap(BRANCH)}`;
   const list=getFilteredPetty();
   const spent=PETTY.reduce((a,p)=>a+(+p.cost||0),0);
   const bal=FLOAT-spent;
@@ -1118,7 +1132,6 @@ floatInput.addEventListener('change',async()=>{FLOAT=+floatInput.value||0;
 const expModal=document.getElementById('expModal');let editingId=null;
 document.getElementById('addExpBtn').onclick=()=>openExp(null);
 function openExp(id){
-  if(BRANCH!=='unaizah'){toast('Petty cash is Unaizah-only',true);return}
   editingId=id;
   document.getElementById('expTitle').textContent=id?'Edit expense':'Add expense';
   const p=id?PETTY.find(x=>x.id===id):null;
@@ -1137,7 +1150,7 @@ document.getElementById('expSave').onclick=async()=>{
   const vendor=document.getElementById('eVendor').value.trim();
   if(!date||!vendor||isNaN(cost)){toast('Date, vendor and cost are required',true);return}
   const rec={id:editingId||'pc_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
-    branch:'unaizah',date,cost,vendor,invoice:document.getElementById('eInv').value.trim(),purpose:document.getElementById('ePurpose').value.trim()};
+    branch:BRANCH,date,cost,vendor,invoice:document.getElementById('eInv').value.trim(),purpose:document.getElementById('ePurpose').value.trim()};
   // preserve existing storage refs if editing
   if(editingId){const existing=PETTY.find(x=>x.id===editingId);if(existing){rec.downloadURL=existing.downloadURL;rec.storagePath=existing.storagePath;rec.vatNumber=existing.vatNumber}}
   await DB.put('petty',rec);
@@ -1184,15 +1197,147 @@ document.getElementById('branchSwitch').querySelectorAll('.branch-btn').forEach(
   toast(`Switched to ${branchCap(BRANCH)}`,'info');
   // Re-attach Firestore listeners for new branch
   DB.attachListeners();
-  // Load float for new branch (unaizah only)
-  if(BRANCH==='unaizah'){
-    try{
-      const f=await DB.get('settings','float');
-      FLOAT=f&&f.v!=null?f.v:5000;
-    }catch(e){FLOAT=5000}
-    floatInput.value=FLOAT;
-  }
+  // Load float for the new branch
+  try{
+    const f=await DB.get('settings','float');
+    FLOAT=f&&f.v!=null?f.v:5000;
+  }catch(e){FLOAT=5000}
+  floatInput.value=FLOAT;
 });
+
+/* ============================================================
+   BULK ZIP IMPORT — parse folder path, QR-scan, upload to Firebase
+   ============================================================ */
+const zipDrop=document.getElementById('zipDrop'),zipInput=document.getElementById('zipInput');
+zipDrop.onclick=()=>zipInput.click();
+['dragenter','dragover'].forEach(ev=>zipDrop.addEventListener(ev,e=>{e.preventDefault();zipDrop.classList.add('over')}));
+['dragleave','drop'].forEach(ev=>zipDrop.addEventListener(ev,e=>{e.preventDefault();zipDrop.classList.remove('over')}));
+zipDrop.addEventListener('drop',e=>{e.preventDefault();if(e.dataTransfer.files[0])importZip(e.dataTransfer.files[0])});
+zipInput.onchange=e=>{if(e.target.files[0])importZip(e.target.files[0])};
+
+function zipLog(msg,color){
+  const el=document.getElementById('zipLog');
+  const line=document.createElement('div');
+  if(color)line.style.color=color;
+  line.textContent=msg;
+  el.appendChild(line); el.scrollTop=el.scrollHeight;
+}
+
+/* Map a ZIP folder path to {supplier, category, docType} using the registry + path hints */
+function classifyFromPath(pathParts, fileName){
+  // pathParts excludes the root folder; e.g. ['AMNCO','2025','Apr-2025','Invoices']
+  const joined=(pathParts.join(' ')+' '+fileName).toLowerCase();
+  // supplier: match the FIRST path segment against registry, fallback to keyword match
+  let supplier='Unclassified', category='Other';
+  const seg0=(pathParts[0]||'').toLowerCase();
+  for(const s of SUPPLIERS){
+    if(s.key.some(k=>seg0.includes(k.toLowerCase()))){supplier=s.name;category=s.cat;break}
+  }
+  if(supplier==='Unclassified'){
+    // Deposits / Electricity often named differently
+    if(/deposit/.test(seg0)){supplier='BSF Deposits';category='Supplier';}
+    else if(/electric|كهرب/.test(seg0)){supplier='Electricity';category='Supplier';}
+    else { // try whole path
+      for(const s of SUPPLIERS){ if(s.key.some(k=>joined.includes(k.toLowerCase()))){supplier=s.name;category=s.cat;break} }
+    }
+  }
+  // doc type from path/filename
+  let docType='Invoice';
+  if(/time\s*sheet|timesheet|attendance|att\b|الحضور/.test(joined))docType='Timesheet';
+  else if(/delivery|deliver\s*note|diary\s*not|أذن|تسليم|اذن/.test(joined))docType='Delivery Note';
+  return {supplier,category,docType};
+}
+
+async function importZip(file){
+  if(!/\.zip$/i.test(file.name)){toast('Please drop a .zip file',true);return}
+  const branchAtStart=BRANCH;
+  document.getElementById('zipProgress').style.display='block';
+  document.getElementById('zipLog').innerHTML='';
+  const setStatus=(s,pct)=>{document.getElementById('zipStatus').textContent=s;
+    if(pct!=null){document.getElementById('zipPct').textContent=Math.round(pct)+'%';document.getElementById('zipBar').style.width=pct+'%'}};
+  setStatus('Reading ZIP…',2);
+  zipLog('Target branch: '+branchCap(branchAtStart),'var(--orchid-bright)');
+  let zip;
+  try{ zip=await JSZip.loadAsync(file); }
+  catch(e){toast('Could not read ZIP',true);zipLog('ERROR: '+e.message,'var(--red)');return}
+
+  // collect all PDF entries
+  const entries=[];
+  zip.forEach((path,entry)=>{ if(!entry.dir && /\.pdf$/i.test(path)) entries.push({path,entry}); });
+  zipLog('Found '+entries.length+' PDF files');
+  if(!entries.length){toast('No PDFs in ZIP',true);return}
+
+  // load already-filed file names for THIS branch to avoid duplicates
+  const existing=new Set(INVOICES.map(i=>i.fileName+'|'+i.year+'|'+i.monthIndex));
+
+  let done=0, uploaded=0, skipped=0, qrHits=0;
+  for(const {path,entry} of entries){
+    done++;
+    const pct=2+ (done/entries.length)*96;
+    const parts=path.split('/').filter(Boolean);
+    const fileName=parts[parts.length-1];
+    // drop the root folder (e.g. "Unayazh" / "Maithanb")
+    const rel=parts.slice(1, parts.length-1); // folder parts between root and file
+    setStatus('Processing '+done+' / '+entries.length+' — '+fileName.slice(0,30), pct);
+    try{
+      const blob=await entry.async('blob');
+      const pdfFile=new File([blob], fileName, {type:'application/pdf'});
+      // classify by path
+      const cls=classifyFromPath(rel, fileName);
+      // date from path+filename
+      const dt=detectDate(rel.join(' ')+' '+fileName,'');
+      // QR scan (best effort, gives amount/date/vat)
+      let qr=null;
+      try{ qr=await scanPdfForQR(pdfFile); }catch(e){}
+      let date=null, amount=null, vatNumber=null;
+      let supplier=cls.supplier, category=cls.category;
+      if(qr){
+        qrHits++;
+        vatNumber=qr.vat||null;
+        amount=qr.total?parseFloat(qr.total):null;
+        if(qr.timestamp){const d=new Date(qr.timestamp);if(!isNaN(d)){date=d.toISOString().slice(0,10);}}
+        // VAT match can correct the supplier
+        if(vatNumber){for(const s of SUPPLIERS){if(s.vat&&s.vat.includes(vatNumber)){supplier=s.name;category=s.cat;break}}}
+      }
+      const year = date? new Date(date).getFullYear() : dt.year;
+      const monthIndex = date? new Date(date).getMonth() : dt.monthIndex;
+      // duplicate check
+      const dupKey=fileName+'|'+year+'|'+monthIndex;
+      if(existing.has(dupKey)){skipped++;zipLog('• skip (already filed): '+fileName,'var(--muted-2)');continue}
+      const rec={id:'inv_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+        branch:branchAtStart, supplier, category, docType:cls.docType,
+        year, monthIndex, date, amount, vatNumber,
+        fileName, size:blob.size, uploadedAt:Date.now(), blob:pdfFile};
+      // upload directly to this branch's collection (don't depend on current BRANCH)
+      await uploadInvoiceToBranch(rec, branchAtStart);
+      existing.add(dupKey);
+      uploaded++;
+      zipLog((qr?'⚡':'• ')+supplier+' · '+MONTHS[monthIndex]+' '+year+' · '+cls.docType+(amount?(' · '+amount+' SAR'):''),qr?'var(--teal)':'');
+    }catch(e){
+      zipLog('ERROR on '+fileName+': '+e.message,'var(--red)');
+    }
+  }
+  setStatus('Done — '+uploaded+' uploaded, '+skipped+' skipped, '+qrHits+' QR-verified',100);
+  zipLog('────────────','var(--gold)');
+  zipLog('✓ Complete: '+uploaded+' uploaded · '+skipped+' duplicates skipped · '+qrHits+' read via ZATCA QR','var(--green)');
+  toast('Import complete — '+uploaded+' invoices added to '+branchCap(branchAtStart));
+}
+
+/* Upload one invoice to a SPECIFIC branch (used by bulk import, branch-independent) */
+async function uploadInvoiceToBranch(rec, branch){
+  const data={...rec};
+  if(rec.blob instanceof File){
+    try{
+      const sp=`${branch}/invoices/${rec.id}.pdf`;
+      const ref=_fst.ref(sp);
+      await ref.put(rec.blob,{contentType:'application/pdf'});
+      data.storagePath=sp;
+      data.downloadURL=await ref.getDownloadURL();
+    }catch(e){console.error('storage upload failed',e);}
+    delete data.blob;
+  }
+  await _fdb.collection(`invoices_${branch}`).doc(rec.id).set(data);
+}
 
 /* ============================================================
    HELPERS
