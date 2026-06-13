@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Noir Cinema · Invoice Vault — Unaizah</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{
+  --bg:#0E0716; --bg-2:#150B22; --surface:#1C1230; --surface-2:#251739;
+  --line:#34244e; --line-soft:#291a40;
+  --orchid:#B57EDC; --orchid-bright:#C792F0; --violet:#7B4BC9;
+  --gold:#E3B458; --gold-soft:#f0d290;
+  --text:#F4EFFA; --muted:#A593C4; --muted-2:#7e6ca0;
+  --green:#4ADE9E; --red:#FF6B7A; --amber:#F5B945;
+  --r:14px; --r-sm:10px;
+  --shadow:0 18px 50px -18px rgba(0,0,0,.7);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:
+    radial-gradient(1100px 620px at 78% -8%, rgba(181,126,220,.16), transparent 60%),
+    radial-gradient(900px 560px at 8% 4%, rgba(227,180,88,.07), transparent 55%),
+    var(--bg);
+  color:var(--text); font-family:'Inter',system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased; min-height:100vh;
+}
+a{color:inherit}
+button{font-family:inherit;cursor:pointer}
+::selection{background:rgba(181,126,220,.35)}
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* ---------- Top marquee header ---------- */
+header.marquee{
+  position:sticky;top:0;z-index:40;
+  background:linear-gradient(180deg, rgba(21,11,34,.92), rgba(14,7,22,.82));
+  backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line-soft);
+}
+.marquee-inner{max-width:1240px;margin:0 auto;padding:14px 22px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:13px;min-width:0}
+.bulb{
+  width:42px;height:42px;border-radius:11px;flex:none;
+  background:linear-gradient(150deg,var(--violet),var(--orchid));
+  display:grid;place-items:center;box-shadow:0 0 0 1px rgba(199,146,240,.4), 0 8px 22px -8px rgba(123,75,201,.8);
+  position:relative;
+}
+.bulb svg{width:23px;height:23px}
+.brand-txt{display:flex;flex-direction:column;line-height:1;min-width:0}
+.brand-txt .l1{font-family:'Cormorant Garamond',serif;font-weight:700;font-size:1.5rem;letter-spacing:.5px;color:var(--gold-soft)}
+.brand-txt .l2{font-size:.66rem;letter-spacing:.32em;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.spacer{flex:1}
+.branch-pill{
+  display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:99px;
+  background:rgba(181,126,220,.1);border:1px solid var(--line);font-size:.74rem;color:var(--muted);
+}
+.branch-pill b{color:var(--gold-soft);font-weight:600}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+
+/* ---------- Tabs ---------- */
+nav.tabs{max-width:1240px;margin:0 auto;padding:0 22px;display:flex;gap:4px;overflow-x:auto}
+.tab{
+  appearance:none;background:none;border:none;color:var(--muted);
+  padding:13px 17px;font-size:.86rem;font-weight:600;letter-spacing:.01em;
+  border-bottom:2px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:8px;
+  transition:color .15s;
+}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--gold-soft);border-bottom-color:var(--gold)}
+.tab .cnt{font-size:.7rem;background:rgba(181,126,220,.16);color:var(--orchid-bright);padding:1px 7px;border-radius:99px;font-family:'JetBrains Mono',monospace}
+
+main{max-width:1240px;margin:0 auto;padding:26px 22px 90px}
+.view{display:none;animation:fade .35s ease}
+.view.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+h2.section{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:1.75rem;margin:0 0 3px;color:var(--text);letter-spacing:.3px}
+.section-sub{color:var(--muted);font-size:.85rem;margin:0 0 22px}
+
+/* ---------- Cards / KPI ---------- */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:26px}
+.kpi{
+  background:linear-gradient(160deg,var(--surface),var(--bg-2));
+  border:1px solid var(--line-soft);border-radius:var(--r);padding:18px;position:relative;overflow:hidden;
+}
+.kpi::after{content:"";position:absolute;inset:0 0 auto auto;width:90px;height:90px;background:radial-gradient(circle at top right,rgba(227,180,88,.14),transparent 70%)}
+.kpi .lab{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.kpi .val{font-family:'Cormorant Garamond',serif;font-weight:700;font-size:2.3rem;line-height:1.05;margin-top:6px}
+.kpi .val.gold{color:var(--gold-soft)} .kpi .val.orchid{color:var(--orchid-bright)}
+.kpi .meta{font-size:.74rem;color:var(--muted-2);margin-top:4px}
+
+.panel{background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--r);padding:20px;margin-bottom:18px}
+.panel-h{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.panel-h h3{margin:0;font-size:.95rem;font-weight:600;letter-spacing:.02em;display:flex;align-items:center;gap:9px}
+.panel-h h3 .ic{color:var(--orchid)}
+.hint{font-size:.74rem;color:var(--muted-2)}
+
+/* bars */
+.bars{display:flex;flex-direction:column;gap:9px}
+.bar-row{display:grid;grid-template-columns:92px 1fr 44px;align-items:center;gap:12px;font-size:.8rem}
+.bar-row .nm{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-track{height:9px;background:var(--line-soft);border-radius:99px;overflow:hidden}
+.bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--violet),var(--orchid))}
+.bar-row .qt{text-align:right;font-family:'JetBrains Mono',monospace;color:var(--gold-soft);font-size:.78rem}
+
+/* coverage grid */
+.cov-wrap{overflow-x:auto}
+table.cov{border-collapse:collapse;width:100%;min-width:680px;font-size:.78rem}
+table.cov th,table.cov td{padding:8px 6px;text-align:center}
+table.cov thead th{color:var(--muted-2);font-weight:600;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--line-soft)}
+table.cov tbody td:first-child,table.cov thead th:first-child{text-align:left;color:var(--text);font-weight:500;white-space:nowrap;padding-left:2px}
+.dot{width:20px;height:20px;border-radius:6px;display:inline-grid;place-items:center;margin:auto;background:var(--line-soft);color:transparent;font-size:.66rem}
+.dot.has{background:linear-gradient(150deg,var(--gold),var(--gold-soft));color:#3a2a05;font-weight:700}
+.dot.multi{background:linear-gradient(150deg,var(--orchid),var(--orchid-bright));color:#23103a}
+
+/* ---------- Upload ---------- */
+.drop{
+  border:1.5px dashed var(--line);border-radius:var(--r);padding:34px 22px;text-align:center;
+  background:rgba(28,18,48,.4);transition:.18s;cursor:pointer;
+}
+.drop:hover,.drop.over{border-color:var(--orchid);background:rgba(123,75,201,.1)}
+.drop .big{font-family:'Cormorant Garamond',serif;font-size:1.35rem;color:var(--text);margin:8px 0 2px}
+.drop .sm{font-size:.8rem;color:var(--muted)}
+.drop .ico{width:46px;height:46px;color:var(--orchid);margin:0 auto}
+
+/* review cards */
+.review{display:flex;flex-direction:column;gap:12px;margin-top:16px}
+.rev-card{
+  background:linear-gradient(150deg,var(--surface-2),var(--surface));border:1px solid var(--line);
+  border-radius:var(--r-sm);padding:14px;display:grid;grid-template-columns:1fr;gap:12px;
+}
+.rev-top{display:flex;align-items:center;gap:11px;min-width:0}
+.rev-top .fic{width:34px;height:34px;border-radius:8px;background:rgba(227,180,88,.12);display:grid;place-items:center;color:var(--gold);flex:none}
+.rev-fname{font-size:.82rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rev-sz{font-size:.7rem;color:var(--muted-2);font-family:'JetBrains Mono',monospace}
+.conf{font-size:.66rem;padding:2px 8px;border-radius:99px;font-weight:600;white-space:nowrap}
+.conf.hi{background:rgba(74,222,158,.14);color:var(--green)}
+.conf.lo{background:rgba(245,185,69,.15);color:var(--amber)}
+.rev-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2)}
+select,input[type=text],input[type=number],input[type=date],textarea{
+  width:100%;background:var(--bg-2);border:1px solid var(--line);color:var(--text);
+  border-radius:8px;padding:8px 10px;font-size:.82rem;font-family:inherit;
+}
+select:focus,input:focus,textarea:focus{outline:none;border-color:var(--orchid)}
+.rev-actions{display:flex;justify-content:flex-end;gap:8px}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface-2);
+  color:var(--text);padding:9px 15px;border-radius:9px;font-size:.8rem;font-weight:600;transition:.15s}
+.btn:hover{border-color:var(--orchid);background:rgba(123,75,201,.16)}
+.btn.gold{background:linear-gradient(150deg,var(--gold),var(--gold-soft));color:#33240a;border:none}
+.btn.gold:hover{filter:brightness(1.07)}
+.btn.ghost{background:none}
+.btn.sm{padding:6px 11px;font-size:.74rem}
+.btn.danger:hover{border-color:var(--red);color:var(--red);background:rgba(255,107,122,.08)}
+.btn.icon{padding:7px;width:34px;height:34px;justify-content:center}
+
+/* filters */
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+.toolbar .search{flex:1;min-width:180px;position:relative}
+.toolbar .search input{padding-left:34px}
+.toolbar .search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--muted-2)}
+.toolbar select{width:auto;min-width:120px}
+
+/* tree */
+.sup-group{border:1px solid var(--line-soft);border-radius:var(--r);margin-bottom:12px;overflow:hidden;background:var(--surface)}
+.sup-head{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;user-select:none}
+.sup-head:hover{background:var(--surface-2)}
+.sup-badge{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;font-family:'Cormorant Garamond',serif;font-weight:700;font-size:1.1rem;color:#23103a;background:linear-gradient(150deg,var(--orchid),var(--orchid-bright));flex:none}
+.sup-name{font-weight:600;font-size:.94rem}
+.sup-sub{font-size:.72rem;color:var(--muted)}
+.sup-count{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--gold-soft)}
+.chev{transition:transform .2s;color:var(--muted)}
+.sup-group.open .chev{transform:rotate(90deg)}
+.sup-body{display:none;border-top:1px solid var(--line-soft);padding:6px 10px 12px}
+.sup-group.open .sup-body{display:block}
+.yr-label{font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);margin:12px 6px 6px}
+.doc-row{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:9px;transition:background .12s}
+.doc-row:hover{background:var(--surface-2)}
+.doc-ic{width:30px;height:30px;border-radius:7px;display:grid;place-items:center;flex:none;font-size:.6rem;font-weight:700}
+.doc-ic.inv{background:rgba(227,180,88,.14);color:var(--gold)}
+.doc-ic.tim{background:rgba(123,75,201,.2);color:var(--orchid-bright)}
+.doc-ic.del{background:rgba(74,222,158,.14);color:var(--green)}
+.doc-meta{min-width:0;flex:1}
+.doc-meta .dn{font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.doc-meta .dd{font-size:.68rem;color:var(--muted-2);font-family:'JetBrains Mono',monospace}
+.doc-month{font-size:.68rem;color:var(--orchid);background:rgba(181,126,220,.1);padding:2px 8px;border-radius:6px;white-space:nowrap}
+
+/* petty cash */
+.pc-balance{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:22px}
+.pc-card{background:linear-gradient(160deg,var(--surface),var(--bg-2));border:1px solid var(--line-soft);border-radius:var(--r);padding:18px}
+.pc-card .lab{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.pc-card .amt{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:1.7rem;margin-top:8px}
+.pc-card .amt small{font-size:.8rem;color:var(--muted);font-weight:400;margin-left:4px}
+.pc-card.float .amt{color:var(--text)}
+.pc-card.spent .amt{color:var(--amber)}
+.pc-card.bal.pos .amt{color:var(--green)} .pc-card.bal.neg .amt{color:var(--red)}
+.pc-card.float input{font-family:'JetBrains Mono',monospace;font-size:1.4rem;font-weight:600;background:transparent;border:none;border-bottom:1px dashed var(--line);padding:4px 0;margin-top:6px;color:var(--text)}
+.pc-card.float input:focus{border-bottom-color:var(--gold)}
+.progress{height:7px;background:var(--line-soft);border-radius:99px;overflow:hidden;margin-top:12px}
+.progress > div{height:100%;background:linear-gradient(90deg,var(--gold),var(--amber));border-radius:99px;transition:width .5s}
+
+table.pc{width:100%;border-collapse:collapse;font-size:.8rem}
+table.pc thead th{text-align:left;color:var(--muted-2);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:10px 10px;border-bottom:1px solid var(--line-soft);position:sticky;top:0;background:var(--surface)}
+table.pc tbody td{padding:10px 10px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+table.pc tbody tr:hover{background:var(--surface-2)}
+table.pc .c-cost{font-family:'JetBrains Mono',monospace;color:var(--gold-soft);text-align:right;white-space:nowrap}
+table.pc .c-date{font-family:'JetBrains Mono',monospace;color:var(--muted);white-space:nowrap}
+table.pc .c-inv{font-family:'JetBrains Mono',monospace;color:var(--muted-2);font-size:.72rem}
+.pc-vendor{font-weight:500}
+.pc-purpose{color:var(--muted);font-size:.74rem;margin-top:2px}
+.pc-tbl-wrap{max-height:560px;overflow:auto;border:1px solid var(--line-soft);border-radius:var(--r)}
+
+/* empty */
+.empty{text-align:center;padding:46px 20px;color:var(--muted)}
+.empty .e-ic{width:54px;height:54px;color:var(--line);margin:0 auto 12px}
+.empty .e-ic svg{width:100%;height:100%}
+.empty h4{font-family:'Cormorant Garamond',serif;font-size:1.3rem;color:var(--text);margin:0 0 5px;font-weight:600}
+.empty p{font-size:.84rem;margin:0}
+
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(8,4,14,.78);backdrop-filter:blur(4px);z-index:60;display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto}
+.modal-bg.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);width:100%;max-width:560px;box-shadow:var(--shadow);animation:pop .25s}
+@keyframes pop{from{opacity:0;transform:scale(.96) translateY(10px)}to{opacity:1;transform:none}}
+.modal-h{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--line-soft)}
+.modal-h h3{margin:0;font-family:'Cormorant Garamond',serif;font-weight:600;font-size:1.3rem}
+.modal-b{padding:20px}
+.modal-f{display:flex;justify-content:flex-end;gap:10px;padding:0 20px 20px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-grid .full{grid-column:1/-1}
+
+/* toast */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);z-index:80;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--text);padding:12px 18px;border-radius:11px;
+  font-size:.84rem;box-shadow:var(--shadow);opacity:0;transition:.3s;display:flex;align-items:center;gap:9px}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+#toast .t-dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
+#toast.err .t-dot{background:var(--red)}
+
+.pdf-overlay{position:fixed;inset:0;background:rgba(8,4,14,.9);z-index:70;display:none;flex-direction:column;padding:18px}
+.pdf-overlay.show{display:flex}
+.pdf-bar{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.pdf-bar .nm{font-size:.88rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pdf-frame{flex:1;border:1px solid var(--line);border-radius:var(--r);background:#fff;overflow:hidden}
+.pdf-frame iframe{width:100%;height:100%;border:none}
+
+@media(max-width:640px){
+  .marquee-inner{padding:12px 16px}
+  main{padding:20px 16px 80px}
+  nav.tabs{padding:0 16px}
+  .form-grid{grid-template-columns:1fr}
+  .brand-txt .l1{font-size:1.25rem}
+}
+.foot{max-width:1240px;margin:30px auto 0;padding:18px 22px;border-top:1px solid var(--line-soft);color:var(--muted-2);font-size:.74rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.foot .sky{color:var(--orchid)}
+</style>
+</head>
+<body>
+
+<header class="marquee">
+  <div class="marquee-inner">
+    <div class="brand">
+      <div class="bulb">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v5M16 4v5M8 20v-5M16 20v-5" stroke-opacity=".75"/></svg>
+      </div>
+      <div class="brand-txt">
+        <span class="l1">Noir Cinema</span>
+        <span class="l2">Invoice Vault</span>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="branch-pill"><span class="sync-dot"></span> Branch · <b>Unaizah</b></div>
+    <div class="branch-pill" id="storagePill">Local vault</div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-view="dash">⬡ Dashboard</button>
+    <button class="tab" data-view="inv">▦ Invoices &amp; Suppliers <span class="cnt" id="invCount">0</span></button>
+    <button class="tab" data-view="petty">◈ Petty Cash</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ===================== DASHBOARD ===================== -->
+  <section class="view active" id="view-dash">
+    <h2 class="section">Vault overview</h2>
+    <p class="section-sub">Everything filed for the Unaizah branch — at a glance.</p>
+    <div class="kpi-row" id="kpiRow"></div>
+
+    <div class="panel">
+      <div class="panel-h">
+        <h3><span class="ic">▤</span> Invoices per month</h3>
+        <span class="hint" id="permonthHint"></span>
+      </div>
+      <div class="bars" id="monthBars"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-h">
+        <h3><span class="ic">◷</span> Supplier coverage map</h3>
+        <span class="hint">Gold = filed · Orchid = multiple · Empty = missing</span>
+      </div>
+      <div class="cov-wrap"><table class="cov" id="covTable"></table></div>
+    </div>
+  </section>
+
+  <!-- ===================== INVOICES ===================== -->
+  <section class="view" id="view-inv">
+    <h2 class="section">Invoices &amp; Suppliers</h2>
+    <p class="section-sub">Drop a PDF — the engine reads it, detects the supplier &amp; date, and files it for you.</p>
+
+    <div class="panel">
+      <div class="drop" id="drop">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4m0 0l-4 4m4-4l4 4"/><path d="M4 14v4a2 2 0 002 2h12a2 2 0 002-2v-4"/></svg>
+        <div class="big">Drop invoice PDFs here</div>
+        <div class="sm">or click to browse — multiple files supported · scanned PDFs welcome</div>
+        <input type="file" id="fileInput" accept="application/pdf" multiple hidden />
+      </div>
+      <div class="review" id="reviewArea"></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        <input type="text" id="invSearch" placeholder="Search file name, supplier…" />
+      </div>
+      <select id="fSupplier"><option value="">All suppliers</option></select>
+      <select id="fYear"><option value="">All years</option></select>
+      <select id="fType"><option value="">All types</option><option>Invoice</option><option>Timesheet</option><option>Delivery Note</option></select>
+      <button class="btn ghost sm" id="backupBtn">⬇ Backup</button>
+    </div>
+
+    <div id="treeArea"></div>
+  </section>
+
+  <!-- ===================== PETTY CASH ===================== -->
+  <section class="view" id="view-petty">
+    <h2 class="section">Petty Cash</h2>
+    <p class="section-sub">Set the float, log each receipt, and the closing balance keeps itself.</p>
+
+    <div class="pc-balance">
+      <div class="pc-card float">
+        <div class="lab">Float allocated</div>
+        <input type="number" id="floatInput" step="0.01" />
+        <div class="hint" style="margin-top:8px">SAR · editable</div>
+      </div>
+      <div class="pc-card spent">
+        <div class="lab">Total expenses</div>
+        <div class="amt" id="pcSpent">0.00 <small>SAR</small></div>
+        <div class="hint" style="margin-top:8px" id="pcCount">0 receipts logged</div>
+      </div>
+      <div class="pc-card bal pos" id="pcBalCard">
+        <div class="lab">Closing balance · cash in hand</div>
+        <div class="amt" id="pcBalance">0.00 <small>SAR</small></div>
+        <div class="progress"><div id="pcProgress" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn gold" id="addExpBtn">＋ Add expense</button>
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        <input type="text" id="pcSearch" placeholder="Search vendor, purpose, invoice…" />
+      </div>
+      <select id="pcMonth"><option value="">All months</option></select>
+      <button class="btn ghost sm" id="pcExport">⬇ Export</button>
+    </div>
+
+    <div class="pc-tbl-wrap">
+      <table class="pc">
+        <thead><tr>
+          <th style="width:34px">#</th><th>Date</th><th>Invoice no.</th><th>Vendor / type</th>
+          <th style="text-align:right">Cost</th><th style="width:60px"></th>
+        </tr></thead>
+        <tbody id="pcBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="foot">
+    <span>Noir Cinema · KSA — Managed &amp; Operated by Mukta A2 Cinemas</span>
+    <span class="sky">Skylr · Developer</span>
+  </div>
+</main>
+
+<!-- expense modal -->
+<div class="modal-bg" id="expModal">
+  <div class="modal">
+    <div class="modal-h"><h3 id="expTitle">Add expense</h3><button class="btn icon ghost" data-close>✕</button></div>
+    <div class="modal-b">
+      <div class="form-grid">
+        <div class="field"><label>Date</label><input type="date" id="eDate"></div>
+        <div class="field"><label>Cost (SAR)</label><input type="number" step="0.01" id="eCost" placeholder="0.00"></div>
+        <div class="field full"><label>Vendor / expense type</label><input type="text" id="eVendor" placeholder="e.g. Othaim Markets"></div>
+        <div class="field full"><label>Invoice number</label><input type="text" id="eInv" placeholder="e.g. 169-5071-102-82"></div>
+        <div class="field full"><label>Purpose</label><textarea id="ePurpose" rows="2" placeholder="What it was for"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-f"><button class="btn ghost" data-close>Cancel</button><button class="btn gold" id="expSave">Save expense</button></div>
+  </div>
+</div>
+
+<div class="pdf-overlay" id="pdfOverlay">
+  <div class="pdf-bar"><span class="nm" id="pdfName"></span><button class="btn sm" id="pdfDownload">⬇ Download</button><button class="btn sm ghost" id="pdfClose">✕ Close</button></div>
+  <div class="pdf-frame"><iframe id="pdfFrame"></iframe></div>
+</div>
+
+<div id="toast"><span class="t-dot"></span><span id="toastMsg"></span></div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+/* ============================================================
+   STORAGE LAYER  (IndexedDB now · Firebase-ready seam)
+   Swap the four async methods below for Firestore + Storage
+   and the rest of the app keeps working unchanged.
+   ============================================================ */
+const DB = (()=>{
+  let db;
+  const open=()=>new Promise((res,rej)=>{
+    const r=indexedDB.open('noir_vault',2);
+    r.onupgradeneeded=e=>{const d=e.target.result;
+      if(!d.objectStoreNames.contains('invoices'))d.createObjectStore('invoices',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('petty'))d.createObjectStore('petty',{keyPath:'id'});
+      if(!d.objectStoreNames.contains('settings'))d.createObjectStore('settings',{keyPath:'k'});
+    };
+    r.onsuccess=e=>{db=e.target.result;res()};r.onerror=e=>rej(e);
+  });
+  const tx=(store,mode)=>db.transaction(store,mode).objectStore(store);
+  const all=store=>new Promise((res)=>{const o=tx(store,'readonly').getAll();o.onsuccess=()=>res(o.result||[])});
+  const put=(store,v)=>new Promise((res)=>{tx(store,'readwrite').put(v).onsuccess=()=>res()});
+  const del=(store,id)=>new Promise((res)=>{tx(store,'readwrite').delete(id).onsuccess=()=>res()});
+  const get=(store,id)=>new Promise((res)=>{const o=tx(store,'readonly').get(id);o.onsuccess=()=>res(o.result)});
+  return {open,all,put,del,get};
+  /* ---- FIREBASE ADAPTER (uncomment & fill config to go cloud) ----
+  // import { initializeApp } from 'firebase/app';
+  // import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc } from 'firebase/firestore';
+  // import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+  // const firebaseConfig = { apiKey:'…', authDomain:'…', projectId:'…', storageBucket:'…' };
+  // Store metadata in Firestore (invoices / petty / settings collections);
+  // store the PDF blob in Firebase Storage and keep its download URL in the
+  // invoice record instead of the local blob. Keep these method names identical. */
+})();
+
+/* ---------- state ---------- */
+let INVOICES=[], PETTY=[], FLOAT=5000;
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+/* ---------- supplier registry (drives the smart engine) ---------- */
+const SUPPLIERS=[
+  {name:'AMNCO',                key:['amnco']},
+  {name:'Coca Cola',            key:['coca','cola']},
+  {name:'Golden Fist',          key:['golden fist','golden','fist']},
+  {name:'United Security',      key:['united security','united','security']},
+  {name:'Mace Environmental',   key:['mace','pest','environmental','مكافحة','الافات']},
+  {name:'Fine (Hygienic Paper)',key:['fine','hygienic','paper']},
+  {name:'Electricity',          key:['electricity','utility','كهرب','tax invoice']},
+  {name:'BSF Deposits',         key:['deposit','bsf']},
+];
+const supInitials=n=>{const w=n.replace(/[()]/g,'').split(/\s+/);return (w[0][0]+(w[1]?w[1][0]:'')).toUpperCase()};
+
+/* ============================================================
+   SMART ENGINE — detect supplier, date, doc-type from a PDF
+   ============================================================ */
+async function extractText(file){
+  try{
+    const buf=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    let txt='';
+    const pages=Math.min(pdf.numPages,2);
+    for(let i=1;i<=pages;i++){
+      const pg=await pdf.getPage(i);
+      const c=await pg.getTextContent();
+      txt+=' '+c.items.map(x=>x.str).join(' ');
+    }
+    return txt.toLowerCase();
+  }catch(e){return ''}
+}
+function detectSupplier(fname,text){
+  const fn=fname.toLowerCase(), tx=text||'';
+  let best=null,score=0;
+  for(const s of SUPPLIERS){
+    let sc=0;
+    for(const k of s.key){
+      if(fn.includes(k))sc+=3;
+      if(tx.includes(k))sc+=1;
+    }
+    if(sc>score){score=sc;best=s.name}
+  }
+  return {supplier:best||'Unclassified', confident:score>=3};
+}
+function detectType(fname,text){
+  const h=(fname+' '+(text||'')).toLowerCase();
+  if(/time\s*sheet|timesheet/.test(h))return 'Timesheet';
+  if(/delivery|deliver\s*note|أذن|تسليم|اذن/.test(h))return 'Delivery Note';
+  return 'Invoice';
+}
+function detectDate(fname,text){
+  const h=fname+' '+(text||'');
+  const monthMap={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+  let year=null,mi=null;
+  // 1) month-name + year e.g. Apr2025 / Mar-2026 / OCT 2025
+  let m=h.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s\-_.]*?(20\d{2})/i);
+  if(m){mi=monthMap[m[1].toLowerCase().slice(0,3)];year=+m[2];}
+  // 2) numeric YYYY-M-D  (2026-5-21)
+  if(year===null){m=h.match(/(20\d{2})[\-_.\/](\d{1,2})[\-_.\/](\d{1,2})/);
+    if(m){year=+m[1];mi=Math.min(11,Math.max(0,(+m[2])-1));}}
+  // 3) numeric D-M-YYYY or M-D-YYYY  (09-04-2026 / 03-28-2026)
+  if(year===null){m=h.match(/(\d{1,2})[\-_.\/](\d{1,2})[\-_.\/](20\d{2})/);
+    if(m){year=+m[3];const a=+m[1],b=+m[2];mi=Math.min(11,Math.max(0,(a>12?b:a)-1));}}
+  // 4) lone month name + lone year anywhere
+  if(mi===null){const mm=h.toLowerCase().match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/);if(mm)mi=monthMap[mm[1]];}
+  if(year===null){const yy=h.match(/20\d{2}/);if(yy)year=+yy[0];}
+  const now=new Date();
+  if(year===null)year=now.getFullYear();
+  if(mi===null)mi=now.getMonth();
+  return {year,monthIndex:mi};
+}
+
+/* ============================================================
+   UPLOAD FLOW
+   ============================================================ */
+const drop=document.getElementById('drop'),fileInput=document.getElementById('fileInput'),reviewArea=document.getElementById('reviewArea');
+drop.onclick=()=>fileInput.click();
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop',e=>handleFiles(e.dataTransfer.files));
+fileInput.onchange=e=>handleFiles(e.target.files);
+
+async function handleFiles(list){
+  const files=[...list].filter(f=>f.type==='application/pdf'||f.name.toLowerCase().endsWith('.pdf'));
+  if(!files.length){toast('Only PDF files are supported',true);return}
+  for(const f of files){
+    const card=document.createElement('div');card.className='rev-card';
+    card.innerHTML=`<div class="rev-top"><div class="fic">▦</div>
+      <div style="min-width:0;flex:1"><div class="rev-fname">${esc(f.name)}</div><div class="rev-sz">${fmtSize(f.size)} · reading…</div></div></div>`;
+    reviewArea.prepend(card);
+    const text=await extractText(f);
+    const sup=detectSupplier(f.name,text);
+    const dt=detectDate(f.name,text);
+    const type=detectType(f.name,text);
+    buildReviewCard(card,f,sup,dt,type);
+  }
+}
+function buildReviewCard(card,file,sup,dt,type){
+  const supOpts=SUPPLIERS.map(s=>`<option ${s.name===sup.supplier?'selected':''}>${s.name}</option>`).join('')+
+    `<option ${sup.supplier==='Unclassified'?'selected':''}>Unclassified</option>`;
+  const yrOpts=[2024,2025,2026,2027].map(y=>`<option ${y===dt.year?'selected':''}>${y}</option>`).join('');
+  const moOpts=MONTH_FULL.map((m,i)=>`<option value="${i}" ${i===dt.monthIndex?'selected':''}>${m}</option>`).join('');
+  const tyOpts=['Invoice','Timesheet','Delivery Note'].map(t=>`<option ${t===type?'selected':''}>${t}</option>`).join('');
+  card.innerHTML=`
+    <div class="rev-top">
+      <div class="fic">▦</div>
+      <div style="min-width:0;flex:1"><div class="rev-fname">${esc(file.name)}</div><div class="rev-sz">${fmtSize(file.size)}</div></div>
+      <span class="conf ${sup.confident?'hi':'lo'}">${sup.confident?'Auto-detected':'Please confirm'}</span>
+    </div>
+    <div class="rev-fields">
+      <div class="field"><label>Supplier</label><select data-k="supplier">${supOpts}</select></div>
+      <div class="field"><label>Type</label><select data-k="type">${tyOpts}</select></div>
+      <div class="field"><label>Year</label><select data-k="year">${yrOpts}</select></div>
+      <div class="field"><label>Month</label><select data-k="month">${moOpts}</select></div>
+    </div>
+    <div class="rev-actions">
+      <button class="btn ghost sm" data-act="discard">Discard</button>
+      <button class="btn gold sm" data-act="file">✓ File it</button>
+    </div>`;
+  card.querySelector('[data-act="discard"]').onclick=()=>card.remove();
+  card.querySelector('[data-act="file"]').onclick=async()=>{
+    const g=k=>card.querySelector(`[data-k="${k}"]`).value;
+    const rec={id:'inv_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+      supplier:g('supplier'),docType:g('type'),year:+g('year'),monthIndex:+g('month'),
+      fileName:file.name,size:file.size,uploadedAt:Date.now(),blob:file};
+    await DB.put('invoices',rec);
+    INVOICES.push(rec);
+    card.style.transition='.3s';card.style.opacity='0';card.style.transform='translateX(20px)';
+    setTimeout(()=>card.remove(),300);
+    toast(`Filed under ${rec.supplier} · ${MONTHS[rec.monthIndex]} ${rec.year}`);
+    renderAll();
+  };
+}
+
+/* ============================================================
+   RENDER — dashboard
+   ============================================================ */
+function renderDash(){
+  const total=INVOICES.length;
+  const supSet=new Set(INVOICES.map(i=>i.supplier));
+  const now=new Date(),cm=now.getMonth(),cy=now.getFullYear();
+  const thisMonth=INVOICES.filter(i=>i.monthIndex===cm&&i.year===cy).length;
+  const bytes=INVOICES.reduce((a,i)=>a+(i.size||0),0);
+  document.getElementById('kpiRow').innerHTML=`
+    ${kpi('Documents filed',total,'gold','across all suppliers')}
+    ${kpi('Active suppliers',supSet.size,'orchid','with at least one file')}
+    ${kpi('This month',thisMonth,'','filed in '+MONTHS[cm]+' '+cy)}
+    ${kpi('Vault size',fmtSize(bytes),'','stored locally')}`;
+  // per-month bars (current + last year span)
+  const byMonth={};
+  INVOICES.forEach(i=>{const key=`${i.year}-${i.monthIndex}`;byMonth[key]=(byMonth[key]||0)+1});
+  const keys=Object.keys(byMonth).sort();
+  const max=Math.max(1,...Object.values(byMonth));
+  document.getElementById('monthBars').innerHTML = keys.length? keys.map(k=>{
+    const [y,m]=k.split('-');const q=byMonth[k];
+    return `<div class="bar-row"><span class="nm">${MONTHS[+m]} ${y}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${q/max*100}%"></div></div>
+      <span class="qt">${q}</span></div>`;
+  }).join('') : emptyInline('No invoices filed yet');
+  document.getElementById('permonthHint').textContent = keys.length?`${keys.length} active months`:'';
+  renderCoverage();
+}
+function renderCoverage(){
+  const yrs=[...new Set(INVOICES.map(i=>i.year))].sort();
+  const year=yrs.length?yrs[yrs.length-1]:new Date().getFullYear();
+  let head=`<thead><tr><th>Supplier · ${year}</th>${MONTHS.map(m=>`<th>${m}</th>`).join('')}</tr></thead>`;
+  const sups=[...new Set(INVOICES.map(i=>i.supplier))].sort();
+  let body='<tbody>';
+  if(!sups.length){body+=`<tr><td colspan="13">${emptyInline('Coverage map fills as you file invoices')}</td></tr>`;}
+  sups.forEach(s=>{
+    body+=`<tr><td>${esc(s)}</td>`;
+    for(let m=0;m<12;m++){
+      const n=INVOICES.filter(i=>i.supplier===s&&i.year===year&&i.monthIndex===m).length;
+      const cls=n===0?'':(n>1?'dot multi':'dot has');
+      body+=`<td>${n===0?'<span class="dot"></span>':`<span class="${cls}">${n}</span>`}</td>`;
+    }
+    body+='</tr>';
+  });
+  body+='</tbody>';
+  document.getElementById('covTable').innerHTML=head+body;
+}
+function kpi(lab,val,cls,meta){return `<div class="kpi"><div class="lab">${lab}</div><div class="val ${cls}">${val}</div><div class="meta">${meta}</div></div>`}
+function emptyInline(t){return `<div style="text-align:center;color:var(--muted-2);font-size:.82rem;padding:18px">${t}</div>`}
+
+/* ============================================================
+   RENDER — invoices tree
+   ============================================================ */
+function refreshFilters(){
+  const sups=[...new Set(INVOICES.map(i=>i.supplier))].sort();
+  const yrs=[...new Set(INVOICES.map(i=>i.year))].sort();
+  fillSelect('fSupplier','All suppliers',sups);
+  fillSelect('fYear','All years',yrs);
+  document.getElementById('invCount').textContent=INVOICES.length;
+}
+function fillSelect(id,first,arr){
+  const el=document.getElementById(id),cur=el.value;
+  el.innerHTML=`<option value="">${first}</option>`+arr.map(a=>`<option>${a}</option>`).join('');
+  if([...el.options].some(o=>o.value==cur))el.value=cur;
+}
+function renderTree(){
+  const q=document.getElementById('invSearch').value.toLowerCase();
+  const fs=document.getElementById('fSupplier').value,fy=document.getElementById('fYear').value,ft=document.getElementById('fType').value;
+  let list=INVOICES.filter(i=>
+    (!fs||i.supplier===fs)&&(!fy||i.year==fy)&&(!ft||i.docType===ft)&&
+    (!q||i.fileName.toLowerCase().includes(q)||i.supplier.toLowerCase().includes(q)));
+  const area=document.getElementById('treeArea');
+  if(!list.length){
+    area.innerHTML=`<div class="empty"><div class="e-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/></svg></div>
+      <h4>${INVOICES.length?'No matches':'The vault is empty'}</h4><p>${INVOICES.length?'Try clearing the filters above.':'Drop your first invoice PDF to begin filing.'}</p></div>`;
+    return;
+  }
+  const bySup={};
+  list.forEach(i=>{(bySup[i.supplier]=bySup[i.supplier]||[]).push(i)});
+  area.innerHTML=Object.keys(bySup).sort().map(sup=>{
+    const items=bySup[sup].sort((a,b)=> b.year-a.year || b.monthIndex-a.monthIndex);
+    const byYear={};items.forEach(i=>{(byYear[i.year]=byYear[i.year]||[]).push(i)});
+    const yrsHtml=Object.keys(byYear).sort((a,b)=>b-a).map(y=>{
+      const rows=byYear[y].map(i=>{
+        const tc=i.docType==='Timesheet'?'tim':i.docType==='Delivery Note'?'del':'inv';
+        const tl=i.docType==='Timesheet'?'TS':i.docType==='Delivery Note'?'DN':'IN';
+        return `<div class="doc-row" data-id="${i.id}">
+          <div class="doc-ic ${tc}">${tl}</div>
+          <div class="doc-meta"><div class="dn">${esc(i.fileName)}</div><div class="dd">${i.docType} · ${fmtSize(i.size)}</div></div>
+          <span class="doc-month">${MONTHS[i.monthIndex]}</span>
+          <button class="btn icon ghost sm" data-view-pdf="${i.id}" title="Open">↗</button>
+          <button class="btn icon ghost sm danger" data-del="${i.id}" title="Delete">✕</button>
+        </div>`;
+      }).join('');
+      return `<div class="yr-label">${y} · ${byYear[y].length} doc${byYear[y].length>1?'s':''}</div>${rows}`;
+    }).join('');
+    return `<div class="sup-group">
+      <div class="sup-head" data-toggle>
+        <div class="sup-badge">${supInitials(sup)}</div>
+        <div><div class="sup-name">${esc(sup)}</div><div class="sup-sub">${monthsSpan(items)}</div></div>
+        <span class="sup-count">${items.length}</span>
+        <span class="chev">›</span>
+      </div>
+      <div class="sup-body">${yrsHtml}</div>
+    </div>`;
+  }).join('');
+  area.querySelectorAll('[data-toggle]').forEach(h=>h.onclick=()=>h.closest('.sup-group').classList.toggle('open'));
+  area.querySelectorAll('[data-view-pdf]').forEach(b=>b.onclick=e=>{e.stopPropagation();openPdf(b.dataset.viewPdf)});
+  area.querySelectorAll('[data-del]').forEach(b=>b.onclick=async e=>{e.stopPropagation();
+    if(!confirm('Delete this document from the vault?'))return;
+    await DB.del('invoices',b.dataset.del);INVOICES=INVOICES.filter(x=>x.id!==b.dataset.del);toast('Document deleted');renderAll();});
+}
+function monthsSpan(items){
+  const ms=[...new Set(items.map(i=>`${MONTHS[i.monthIndex]} ${String(i.year).slice(2)}`))];
+  return ms.slice(0,6).join(' · ')+(ms.length>6?` +${ms.length-6}`:'');
+}
+async function openPdf(id){
+  const rec=await DB.get('invoices',id);if(!rec)return;
+  const url=URL.createObjectURL(rec.blob);
+  document.getElementById('pdfName').textContent=rec.fileName;
+  document.getElementById('pdfFrame').src=url;
+  document.getElementById('pdfOverlay').classList.add('show');
+  document.getElementById('pdfDownload').onclick=()=>{const a=document.createElement('a');a.href=url;a.download=rec.fileName;a.click()};
+}
+document.getElementById('pdfClose').onclick=()=>{document.getElementById('pdfOverlay').classList.remove('show');document.getElementById('pdfFrame').src=''};
+['invSearch','fSupplier','fYear','fType'].forEach(id=>document.getElementById(id).addEventListener('input',renderTree));
+
+/* ============================================================
+   RENDER — petty cash
+   ============================================================ */
+function renderPetty(){
+  const q=document.getElementById('pcSearch').value.toLowerCase();
+  const fm=document.getElementById('pcMonth').value;
+  let list=PETTY.filter(p=>(!fm||p.date.slice(0,7)===fm)&&
+    (!q||(p.vendor+p.purpose+p.invoice).toLowerCase().includes(q)));
+  list.sort((a,b)=>a.date.localeCompare(b.date));
+  const spent=PETTY.reduce((a,p)=>a+(+p.cost||0),0);
+  const bal=FLOAT-spent;
+  document.getElementById('pcSpent').innerHTML=fmtN(spent)+' <small>SAR</small>';
+  document.getElementById('pcBalance').innerHTML=fmtN(bal)+' <small>SAR</small>';
+  document.getElementById('pcCount').textContent=PETTY.length+' receipts logged';
+  const balCard=document.getElementById('pcBalCard');balCard.classList.toggle('pos',bal>=0);balCard.classList.toggle('neg',bal<0);
+  document.getElementById('pcProgress').style.width=Math.min(100,Math.max(0,spent/FLOAT*100))+'%';
+  // month filter options
+  const months=[...new Set(PETTY.map(p=>p.date.slice(0,7)))].sort();
+  const sel=document.getElementById('pcMonth'),cur=sel.value;
+  sel.innerHTML='<option value="">All months</option>'+months.map(m=>{
+    const [y,mo]=m.split('-');return `<option value="${m}">${MONTH_FULL[+mo-1]} ${y}</option>`}).join('');
+  if([...sel.options].some(o=>o.value===cur))sel.value=cur;
+  // rows
+  const body=document.getElementById('pcBody');
+  if(!list.length){body.innerHTML=`<tr><td colspan="6"><div class="empty" style="padding:30px"><h4>No receipts</h4><p>Add an expense to start the ledger.</p></div></td></tr>`;return}
+  body.innerHTML=list.map((p,idx)=>`<tr>
+    <td class="c-inv">${idx+1}</td>
+    <td class="c-date">${p.date}</td>
+    <td class="c-inv">${esc(p.invoice||'—')}</td>
+    <td><div class="pc-vendor">${esc(p.vendor)}</div>${p.purpose?`<div class="pc-purpose">${esc(p.purpose)}</div>`:''}</td>
+    <td class="c-cost">${fmtN(+p.cost)}</td>
+    <td><div style="display:flex;gap:4px;justify-content:flex-end">
+      <button class="btn icon ghost sm" data-edit="${p.id}">✎</button>
+      <button class="btn icon ghost sm danger" data-delp="${p.id}">✕</button></div></td>
+  </tr>`).join('');
+  body.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openExp(b.dataset.edit));
+  body.querySelectorAll('[data-delp]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Delete this expense?'))return;
+    await DB.del('petty',b.dataset.delp);PETTY=PETTY.filter(x=>x.id!==b.dataset.delp);toast('Expense removed');renderPetty();});
+}
+['pcSearch','pcMonth'].forEach(id=>document.getElementById(id).addEventListener('input',renderPetty));
+const floatInput=document.getElementById('floatInput');
+floatInput.addEventListener('change',async()=>{FLOAT=+floatInput.value||0;await DB.put('settings',{k:'float',v:FLOAT});renderPetty();toast('Float updated')});
+
+/* expense modal */
+const expModal=document.getElementById('expModal');let editingId=null;
+document.getElementById('addExpBtn').onclick=()=>openExp(null);
+function openExp(id){
+  editingId=id;
+  document.getElementById('expTitle').textContent=id?'Edit expense':'Add expense';
+  const p=id?PETTY.find(x=>x.id===id):null;
+  document.getElementById('eDate').value=p?p.date:new Date().toISOString().slice(0,10);
+  document.getElementById('eCost').value=p?p.cost:'';
+  document.getElementById('eVendor').value=p?p.vendor:'';
+  document.getElementById('eInv').value=p?p.invoice:'';
+  document.getElementById('ePurpose').value=p?p.purpose:'';
+  expModal.classList.add('show');
+}
+expModal.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>expModal.classList.remove('show'));
+expModal.onclick=e=>{if(e.target===expModal)expModal.classList.remove('show')};
+document.getElementById('expSave').onclick=async()=>{
+  const date=document.getElementById('eDate').value;
+  const cost=+document.getElementById('eCost').value;
+  const vendor=document.getElementById('eVendor').value.trim();
+  if(!date||!vendor||isNaN(cost)){toast('Date, vendor and cost are required',true);return}
+  const rec={id:editingId||'pc_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+    date,cost,vendor,invoice:document.getElementById('eInv').value.trim(),purpose:document.getElementById('ePurpose').value.trim()};
+  await DB.put('petty',rec);
+  if(editingId){const i=PETTY.findIndex(x=>x.id===editingId);PETTY[i]=rec}else PETTY.push(rec);
+  expModal.classList.remove('show');renderPetty();toast(editingId?'Expense updated':'Expense added');
+};
+
+/* ============================================================
+   BACKUP / EXPORT
+   ============================================================ */
+document.getElementById('pcExport').onclick=()=>{
+  const rows=[['S.No','Date','Invoice Number','Expense Type','Cost (SAR)','Purpose']];
+  PETTY.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach((p,i)=>rows.push([i+1,p.date,p.invoice,p.vendor,p.cost,p.purpose]));
+  const spent=PETTY.reduce((a,p)=>a+(+p.cost||0),0);
+  rows.push([],['','','','Total Expenses',spent.toFixed(2)],['','','','Float',FLOAT.toFixed(2)],['','','','Closing Balance',(FLOAT-spent).toFixed(2)]);
+  const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  downloadBlob(new Blob([csv],{type:'text/csv'}),'NC_Unaizah_PettyCash.csv');toast('Petty cash exported');
+};
+document.getElementById('backupBtn').onclick=()=>{
+  const meta=INVOICES.map(({blob,...m})=>m);
+  downloadBlob(new Blob([JSON.stringify({invoices:meta,petty:PETTY,float:FLOAT,exported:new Date().toISOString()},null,2)],{type:'application/json'}),'noir_vault_backup.json');
+  toast('Metadata backup downloaded');
+};
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function fmtSize(b){if(!b)return '0 KB';const u=['B','KB','MB','GB'];let i=0;while(b>=1024&&i<3){b/=1024;i++}return b.toFixed(b<10&&i>0?1:0)+' '+u[i]}
+function fmtN(n){return (n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function downloadBlob(b,name){const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)}
+let toastT;
+function toast(msg,err){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;t.classList.toggle('err',!!err);t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600)}
+
+/* tabs */
+document.getElementById('tabs').querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');document.getElementById('view-'+t.dataset.view).classList.add('active');
+});
+
+function renderAll(){renderDash();refreshFilters();renderTree();renderPetty()}
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+(async function init(){
+  await DB.open();
+  INVOICES=await DB.all('invoices');
+  PETTY=await DB.all('petty');
+  const fset=await DB.get('settings','float');
+  const seeded=await DB.get('settings','seeded');
+  if(!seeded){
+    // first run — seed the real June petty-cash statement
+    for(const p of PETTY_SEED){const rec={id:'pc_seed_'+Math.random().toString(36).slice(2,8),...p};PETTY.push(rec);await DB.put('petty',rec);}
+    FLOAT=5000;await DB.put('settings',{k:'float',v:5000});await DB.put('settings',{k:'seeded',v:1});
+    toast('Loaded your June petty-cash statement');
+  }else{
+    FLOAT=fset?fset.v:5000;
+  }
+  floatInput.value=FLOAT;
+  renderAll();
+})();
+
+/* ---- seeded petty cash data (your uploaded statement) ---- */
+const PETTY_SEED=/*PETTY_SEED*/[{"date": "2026-04-02", "invoice": "169-5071-102-82", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-04-02", "invoice": "169-5071-102-132", "vendor": "Othaim Markets", "cost": 10.0, "purpose": "Berain bottled water 12 L — staff drinking water (welfare expense)"}, {"date": "2026-04-03", "invoice": "67416", "vendor": "Sama Cleaning Co.", "cost": 55.2, "purpose": "Foks heavy-duty refuse sacks 5LK × 2 — janitorial supplies"}, {"date": "2026-04-05", "invoice": "169-5074-105-161", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-04-05", "invoice": "4846", "vendor": "United Systems", "cost": 400.0, "purpose": "HP toner cartridges W2210A/W2211A/W2212A/W2213A — office printing consumables"}, {"date": "2026-04-08", "invoice": "16559", "vendor": "Themar Unaizah Trading", "cost": 32.0, "purpose": "Tania bottled water 18 L × 4 — staff drinking water (welfare expense)"}, {"date": "2026-04-09", "invoice": "169-5078-103-126", "vendor": "Othaim Markets", "cost": 35.99, "purpose": "Afia Corn-Plus Omega cooking oil 2.9 L — F&B raw material (popcorn/fryer line)"}, {"date": "2026-04-09", "invoice": "13540", "vendor": "Bait Al-Itqan", "cost": 10.0, "purpose": "Abu Jamal rust-remover spray — maintenance & janitorial supplies"}, {"date": "2026-04-10", "invoice": "169-5079-102-82", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-04-10", "invoice": "169-5079-105-48", "vendor": "Othaim Markets", "cost": 107.97, "purpose": "Afia Corn-Plus Omega cooking oil 2.9 L × 3 — F&B raw material (popcorn/fryer line)"}, {"date": "2026-04-10", "invoice": "68319", "vendor": "Sama Cleaning Co.", "cost": 41.4, "purpose": "Hobby carpet shampoo 3 L × 2 — facility deep-cleaning supplies"}, {"date": "2026-04-12", "invoice": "0005-806", "vendor": "Al-Sayer Safety Co.", "cost": 255.0, "purpose": "Annual fire-extinguisher inspection (Civil Defence compliance) — regulatory fees"}, {"date": "2026-04-14", "invoice": "169-5083-103-16", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-04-16", "invoice": "169-5085-103-156", "vendor": "Othaim Markets", "cost": 10.0, "purpose": "Berain bottled water 12 L — slush-machine operating consumable"}, {"date": "2026-04-17", "invoice": "169-5085-102-222", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-04-17", "invoice": "169-5086-103-47", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-04-21", "invoice": "267131375166", "vendor": "Sana Al-Kheir", "cost": 32.02, "purpose": "Moba (cleaning replacement cloths) × 4 — janitorial supplies"}, {"date": "2026-04-21", "invoice": "111333462", "vendor": "SACO", "cost": 89.7, "purpose": "Storage boxes 3-ply 620×580×580 mm × 6 — office storage equipment"}, {"date": "2026-04-22", "invoice": "9143", "vendor": "Al-Amer Bookshop", "cost": 17.01, "purpose": "Banks clear liquid glue 50 g + Fine coloured cardboard 100×70 — office stationery"}, {"date": "2026-04-22", "invoice": "69818", "vendor": "Sama Cleaning Co.", "cost": 48.3, "purpose": "Hobby carpet shampoo 3 L + Foks heavy-duty refuse sacks — janitorial supplies"}, {"date": "2026-04-22", "invoice": "22191", "vendor": "Dar Al-Qalam Stationery", "cost": 9.2, "purpose": "Permanent marker pens × 8 — office stationery"}, {"date": "2026-04-23", "invoice": "9181", "vendor": "Al-Amer Bookshop", "cost": 4.0, "purpose": "Cardboard display sheet RQ-20177 — operations consumables"}, {"date": "2026-04-24", "invoice": "9201", "vendor": "Al-Amer Bookshop", "cost": 13.0, "purpose": "Dunya display cardboard sheet, violet — operations consumables"}, {"date": "2026-04-24", "invoice": "169-5093-102-43", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-04-26", "invoice": "100075557", "vendor": "Al-Majarah Stationery", "cost": 4.0, "purpose": "Assorted stationery items — office supplies"}, {"date": "2026-04-26", "invoice": "300009712", "vendor": "Al-Majarah Stationery", "cost": 14.0, "purpose": "A4 black-and-white photocopying × 14 sheets — office printing"}, {"date": "2026-04-27", "invoice": "70446", "vendor": "Sama Cleaning Co.", "cost": 80.5, "purpose": "Hobby Life 30 L plastic storage boxes × 2 — office storage equipment"}, {"date": "2026-04-27", "invoice": "9376", "vendor": "Al-Amer Bookshop", "cost": 28.0, "purpose": "Pens × 2, Dico self-adhesive velvet 2.5 m, Prima binding roll (violet) — office stationery"}, {"date": "2026-04-27", "invoice": "169-5096-104-153", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-04-27", "invoice": "266035111759", "vendor": "Areej Trading Co.", "cost": 35.98, "purpose": "Decorative photo frame 23035 × 3 — facility furnishing"}, {"date": "2026-04-27", "invoice": "2610042037234", "vendor": "Areej Trading Co.", "cost": 53.0, "purpose": "Wooden display shelves 23340 & 23360 — facility furnishing"}, {"date": "2026-04-28", "invoice": "70649", "vendor": "Sama Cleaning Co.", "cost": 11.5, "purpose": "Loyal general air-freshener 750 ml × 2 — facility ambience"}, {"date": "2026-04-28", "invoice": "169-5097-102-93", "vendor": "Othaim Markets", "cost": 9.98, "purpose": "Net plastic-rim paper cups 50 pc + Happy paper cups 9 oz 50 pc — concession pantry"}, {"date": "2026-05-01", "invoice": "169-5100-103-156", "vendor": "Othaim Markets", "cost": 10.0, "purpose": "Berain bottled water 12 L — staff drinking water (welfare expense)"}, {"date": "2026-05-01", "invoice": "169-5100-103-157", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-05-02", "invoice": "71309", "vendor": "Sama Cleaning Co.", "cost": 119.9, "purpose": "Foks refuse sacks + 10-gal garbage bags + Athir 250 ml air-freshener — janitorial supplies"}, {"date": "2026-05-02", "invoice": "39712", "vendor": "Al-Shafi Foodstuff Wh.", "cost": 32.0, "purpose": "Tania bottled water × 4 — staff drinking water (welfare expense)"}, {"date": "2026-05-03", "invoice": "71434", "vendor": "Sama Cleaning Co.", "cost": 42.0, "purpose": "Athir surface freshener 250 ml × 4 — facility ambience"}, {"date": "2026-05-03", "invoice": "169-5102-103-37", "vendor": "Othaim Markets", "cost": 11.99, "purpose": "Evian bottled water 200 ml — staff drinking water (welfare expense)"}, {"date": "2026-05-04", "invoice": "1214", "vendor": "Khabeer Pest Control Co.", "cost": 40.02, "purpose": "Adhesive insect-trap strips × 4 — pest-management consumables"}, {"date": "2026-05-05", "invoice": "169-5104-103-12", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-05-09", "invoice": "169-5108-102-118", "vendor": "Othaim Markets", "cost": 34.97, "purpose": "Oska & Aquafina 330 ml + Berain 12 L + Happy 9 oz paper cups — pantry/welfare"}, {"date": "2026-05-09", "invoice": "100848372", "vendor": "Tanaseq Al-Anwar", "cost": 12.0, "purpose": "Marline German 1/2\"×1/2\" angle valve — maintenance & plumbing"}, {"date": "2026-05-10", "invoice": "169-5109-102-158", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-05-12", "invoice": "169-5111-102-257", "vendor": "Othaim Markets", "cost": 15.99, "purpose": "Crystal sunflower cooking oil 1.5 L — F&B raw material (popcorn/fryer line)"}, {"date": "2026-05-12", "invoice": "169-5111-102-121", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — samoli bread rolls (F&B raw material, concession stand)"}, {"date": "2026-05-14", "invoice": "42256", "vendor": "Nuhba Java Supermarket", "cost": 6.0, "purpose": "Civic batteries × 2 — operations consumables"}, {"date": "2026-05-14", "invoice": "72843", "vendor": "Sama Cleaning Co.", "cost": 20.7, "purpose": "Cinester centre air-freshener + 250 ml refresher spray — facility ambience"}, {"date": "2026-05-14", "invoice": "42297", "vendor": "Nuhba Java Supermarket", "cost": 24.0, "purpose": "Civic batteries × 8 — operations consumables"}, {"date": "2026-05-15", "invoice": "39866", "vendor": "Al-Shafi Foodstuff Wh.", "cost": 32.0, "purpose": "Tania bottled water × 4 — staff drinking water (welfare expense)"}, {"date": "2026-05-15", "invoice": "169-5114-105-23", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-05-19", "invoice": "169-5118-103-37", "vendor": "Othaim Markets", "cost": 10.0, "purpose": "Happy paper cups 9 oz × 2 — concession pantry"}, {"date": "2026-05-20", "invoice": "73589", "vendor": "Sama Cleaning Co.", "cost": 204.7, "purpose": "Janitorial bundle: refuse sacks, cups, naphthalene, tissues, soap, carpet shampoo, tea cups"}, {"date": "2026-05-20", "invoice": "50000-005-0015", "vendor": "Aromatic", "cost": 299.0, "purpose": "Assorted fragrance oils & perfume blends (6 lines) — facility ambience"}, {"date": "2026-05-20", "invoice": "9885", "vendor": "Jarir Bookstore", "cost": 19.0, "purpose": "Disney Pixar Toy Story 4 tin set — promotional / display merchandise"}, {"date": "2026-05-22", "invoice": "169-5121-103023", "vendor": "Othaim Markets", "cost": 58.47, "purpose": "Ketchup & mustard (hot-dog condiments) — F&B raw material (concession stand)"}, {"date": "2026-05-26", "invoice": "2000095316", "vendor": "Renad", "cost": 248.5, "purpose": "Assorted Eid sweets & confectionery — staff & guest hospitality"}, {"date": "2026-05-26", "invoice": "467", "vendor": "Ajwaa AlRiydah", "cost": 175.0, "purpose": "Pending — original invoice not provided; vendor & purpose require verification"}, {"date": "2026-05-26", "invoice": "169-5125-102-245", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — samoli bread rolls (F&B raw material, concession stand)"}, {"date": "2026-05-28", "invoice": "202605281900023010", "vendor": "Altamimi", "cost": 209.6, "purpose": "Assorted Eid sweets & confectionery — staff & guest hospitality"}, {"date": "2026-05-28", "invoice": "169-5127-10147", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-05-29", "invoice": "169-5128-103-39", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-05-29", "invoice": "169-5128-103-37", "vendor": "Othaim Markets", "cost": 10.0, "purpose": "Concession pantry consumable (bottled water / paper cups) — confirm against receipt"}, {"date": "2026-05-29", "invoice": "169-5128-103-38", "vendor": "Othaim Markets", "cost": 6.53, "purpose": "Concession pantry / sundry consumable — confirm against receipt"}, {"date": "2026-06-01", "invoice": "169-5131-105-18", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — samoli bread rolls (F&B raw material, concession stand)"}, {"date": "2026-06-02", "invoice": "169-5132-103-14", "vendor": "Othaim Markets", "cost": 15.99, "purpose": "Lusine brioche sandwich bread + Hani beef hot dogs — F&B raw material (concession stand)"}, {"date": "2026-06-02", "invoice": "169-5132-103-37", "vendor": "Othaim Markets", "cost": 9.95, "purpose": "Berain bottled water 1.5 L — staff drinking water (welfare expense)"}, {"date": "2026-06-03", "invoice": "75438", "vendor": "Sama Cleaning Co.", "cost": 59.8, "purpose": "Foks heavy-duty refuse sacks 5LK × 2 — janitorial supplies"}, {"date": "2026-06-03", "invoice": "75440", "vendor": "Sama Cleaning Co.", "cost": 11.5, "purpose": "Saver scouring sponges 3+6 + steel-wool scourers 3+6 — janitorial supplies"}]/*END_SEED*/;
+</script>
+</body>
+</html>
