@@ -3,12 +3,17 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Noir Cinema · Invoice Vault — Unaizah</title>
+<title>Noir Cinema · Invoice Vault</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<!-- PDF.js for text extraction -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<!-- Firebase v10 compat (CDN — no build step needed) -->
+<!-- jsQR for ZATCA QR code reading -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<!-- SheetJS for Excel export -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- Firebase v10 compat -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
@@ -23,7 +28,6 @@ firebase.initializeApp({
 });
 const _fdb=firebase.firestore();
 const _fst=firebase.storage();
-// offline persistence — works even with no internet
 _fdb.enablePersistence().catch(()=>{});
 </script>
 <style>
@@ -33,7 +37,7 @@ _fdb.enablePersistence().catch(()=>{});
   --orchid:#B57EDC; --orchid-bright:#C792F0; --violet:#7B4BC9;
   --gold:#E3B458; --gold-soft:#f0d290;
   --text:#F4EFFA; --muted:#A593C4; --muted-2:#7e6ca0;
-  --green:#4ADE9E; --red:#FF6B7A; --amber:#F5B945;
+  --green:#4ADE9E; --red:#FF6B7A; --amber:#F5B945; --teal:#5FD1C8;
   --r:14px; --r-sm:10px;
   --shadow:0 18px 50px -18px rgba(0,0,0,.7);
 }
@@ -47,68 +51,62 @@ body{
   color:var(--text); font-family:'Inter',system-ui,sans-serif;
   -webkit-font-smoothing:antialiased; min-height:100vh;
 }
-a{color:inherit}
 button{font-family:inherit;cursor:pointer}
 ::selection{background:rgba(181,126,220,.35)}
-.mono{font-family:'JetBrains Mono',monospace}
 
-/* ---------- Top marquee header ---------- */
-header.marquee{
-  position:sticky;top:0;z-index:40;
-  background:linear-gradient(180deg, rgba(21,11,34,.92), rgba(14,7,22,.82));
-  backdrop-filter:blur(14px);
-  border-bottom:1px solid var(--line-soft);
-}
-.marquee-inner{max-width:1240px;margin:0 auto;padding:14px 22px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+header.marquee{position:sticky;top:0;z-index:40;
+  background:linear-gradient(180deg, rgba(21,11,34,.95), rgba(14,7,22,.85));
+  backdrop-filter:blur(14px);border-bottom:1px solid var(--line-soft);}
+.marquee-inner{max-width:1280px;margin:0 auto;padding:14px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:13px;min-width:0}
-.bulb{
-  width:42px;height:42px;border-radius:11px;flex:none;
+.bulb{width:42px;height:42px;border-radius:11px;flex:none;
   background:linear-gradient(150deg,var(--violet),var(--orchid));
-  display:grid;place-items:center;box-shadow:0 0 0 1px rgba(199,146,240,.4), 0 8px 22px -8px rgba(123,75,201,.8);
-  position:relative;
-}
+  display:grid;place-items:center;box-shadow:0 0 0 1px rgba(199,146,240,.4),0 8px 22px -8px rgba(123,75,201,.8);}
 .bulb svg{width:23px;height:23px}
 .brand-txt{display:flex;flex-direction:column;line-height:1;min-width:0}
 .brand-txt .l1{font-family:'Cormorant Garamond',serif;font-weight:700;font-size:1.5rem;letter-spacing:.5px;color:var(--gold-soft)}
 .brand-txt .l2{font-size:.66rem;letter-spacing:.32em;text-transform:uppercase;color:var(--muted);margin-top:3px}
 .spacer{flex:1}
-.branch-pill{
-  display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:99px;
-  background:rgba(181,126,220,.1);border:1px solid var(--line);font-size:.74rem;color:var(--muted);
-}
-.branch-pill b{color:var(--gold-soft);font-weight:600}
-.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
 
-/* ---------- Tabs ---------- */
-nav.tabs{max-width:1240px;margin:0 auto;padding:0 22px;display:flex;gap:4px;overflow-x:auto}
-.tab{
-  appearance:none;background:none;border:none;color:var(--muted);
-  padding:13px 17px;font-size:.86rem;font-weight:600;letter-spacing:.01em;
-  border-bottom:2px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:8px;
-  transition:color .15s;
-}
+/* Branch switcher */
+.branch-switch{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:3px;gap:2px}
+.branch-btn{appearance:none;background:none;border:none;color:var(--muted);padding:7px 16px;border-radius:99px;
+  font-size:.78rem;font-weight:600;display:flex;align-items:center;gap:7px;transition:.15s;font-family:inherit;cursor:pointer}
+.branch-btn:hover{color:var(--text)}
+.branch-btn.active{background:linear-gradient(150deg,var(--violet),var(--orchid));color:#fff;box-shadow:0 4px 14px -4px rgba(199,146,240,.5)}
+.branch-btn .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.5}
+.branch-btn.active .dot{opacity:1;background:#fff;box-shadow:0 0 6px #fff}
+
+.sync-pill{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:99px;
+  background:rgba(74,222,158,.08);border:1px solid rgba(74,222,158,.25);font-size:.72rem;color:var(--green)}
+.sync-pill.warn{background:rgba(245,185,69,.08);border-color:rgba(245,185,69,.25);color:var(--amber)}
+.sync-pill .d{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+
+nav.tabs{max-width:1280px;margin:0 auto;padding:0 22px;display:flex;gap:4px;overflow-x:auto}
+.tab{appearance:none;background:none;border:none;color:var(--muted);padding:13px 17px;font-size:.86rem;
+  font-weight:600;letter-spacing:.01em;border-bottom:2px solid transparent;white-space:nowrap;
+  display:flex;align-items:center;gap:8px;transition:color .15s;font-family:inherit;cursor:pointer}
 .tab:hover{color:var(--text)}
 .tab.active{color:var(--gold-soft);border-bottom-color:var(--gold)}
 .tab .cnt{font-size:.7rem;background:rgba(181,126,220,.16);color:var(--orchid-bright);padding:1px 7px;border-radius:99px;font-family:'JetBrains Mono',monospace}
+.tab.disabled{opacity:.35;pointer-events:none}
 
-main{max-width:1240px;margin:0 auto;padding:26px 22px 90px}
+main{max-width:1280px;margin:0 auto;padding:26px 22px 90px}
 .view{display:none;animation:fade .35s ease}
 .view.active{display:block}
 @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
-h2.section{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:1.75rem;margin:0 0 3px;color:var(--text);letter-spacing:.3px}
+h2.section{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:1.75rem;margin:0 0 3px;letter-spacing:.3px}
 .section-sub{color:var(--muted);font-size:.85rem;margin:0 0 22px}
 
-/* ---------- Cards / KPI ---------- */
 .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:26px}
-.kpi{
-  background:linear-gradient(160deg,var(--surface),var(--bg-2));
-  border:1px solid var(--line-soft);border-radius:var(--r);padding:18px;position:relative;overflow:hidden;
-}
-.kpi::after{content:"";position:absolute;inset:0 0 auto auto;width:90px;height:90px;background:radial-gradient(circle at top right,rgba(227,180,88,.14),transparent 70%)}
+.kpi{background:linear-gradient(160deg,var(--surface),var(--bg-2));border:1px solid var(--line-soft);
+  border-radius:var(--r);padding:18px;position:relative;overflow:hidden}
+.kpi::after{content:"";position:absolute;inset:0 0 auto auto;width:90px;height:90px;
+  background:radial-gradient(circle at top right,rgba(227,180,88,.14),transparent 70%)}
 .kpi .lab{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
 .kpi .val{font-family:'Cormorant Garamond',serif;font-weight:700;font-size:2.3rem;line-height:1.05;margin-top:6px}
-.kpi .val.gold{color:var(--gold-soft)} .kpi .val.orchid{color:var(--orchid-bright)}
+.kpi .val.gold{color:var(--gold-soft)} .kpi .val.orchid{color:var(--orchid-bright)} .kpi .val.teal{color:var(--teal)}
 .kpi .meta{font-size:.74rem;color:var(--muted-2);margin-top:4px}
 
 .panel{background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--r);padding:20px;margin-bottom:18px}
@@ -117,15 +115,13 @@ h2.section{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:1.75
 .panel-h h3 .ic{color:var(--orchid)}
 .hint{font-size:.74rem;color:var(--muted-2)}
 
-/* bars */
 .bars{display:flex;flex-direction:column;gap:9px}
-.bar-row{display:grid;grid-template-columns:92px 1fr 44px;align-items:center;gap:12px;font-size:.8rem}
+.bar-row{display:grid;grid-template-columns:110px 1fr 44px;align-items:center;gap:12px;font-size:.8rem}
 .bar-row .nm{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar-track{height:9px;background:var(--line-soft);border-radius:99px;overflow:hidden}
 .bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--violet),var(--orchid))}
 .bar-row .qt{text-align:right;font-family:'JetBrains Mono',monospace;color:var(--gold-soft);font-size:.78rem}
 
-/* coverage grid */
 .cov-wrap{overflow-x:auto}
 table.cov{border-collapse:collapse;width:100%;min-width:680px;font-size:.78rem}
 table.cov th,table.cov td{padding:8px 6px;text-align:center}
@@ -135,42 +131,35 @@ table.cov tbody td:first-child,table.cov thead th:first-child{text-align:left;co
 .dot.has{background:linear-gradient(150deg,var(--gold),var(--gold-soft));color:#3a2a05;font-weight:700}
 .dot.multi{background:linear-gradient(150deg,var(--orchid),var(--orchid-bright));color:#23103a}
 
-/* ---------- Upload ---------- */
-.drop{
-  border:1.5px dashed var(--line);border-radius:var(--r);padding:34px 22px;text-align:center;
-  background:rgba(28,18,48,.4);transition:.18s;cursor:pointer;
-}
+.drop{border:1.5px dashed var(--line);border-radius:var(--r);padding:34px 22px;text-align:center;
+  background:rgba(28,18,48,.4);transition:.18s;cursor:pointer}
 .drop:hover,.drop.over{border-color:var(--orchid);background:rgba(123,75,201,.1)}
-.drop .big{font-family:'Cormorant Garamond',serif;font-size:1.35rem;color:var(--text);margin:8px 0 2px}
+.drop .big{font-family:'Cormorant Garamond',serif;font-size:1.35rem;margin:8px 0 2px}
 .drop .sm{font-size:.8rem;color:var(--muted)}
 .drop .ico{width:46px;height:46px;color:var(--orchid);margin:0 auto}
 
-/* review cards */
 .review{display:flex;flex-direction:column;gap:12px;margin-top:16px}
-.rev-card{
-  background:linear-gradient(150deg,var(--surface-2),var(--surface));border:1px solid var(--line);
-  border-radius:var(--r-sm);padding:14px;display:grid;grid-template-columns:1fr;gap:12px;
-}
+.rev-card{background:linear-gradient(150deg,var(--surface-2),var(--surface));border:1px solid var(--line);
+  border-radius:var(--r-sm);padding:14px;display:flex;flex-direction:column;gap:12px}
 .rev-top{display:flex;align-items:center;gap:11px;min-width:0}
 .rev-top .fic{width:34px;height:34px;border-radius:8px;background:rgba(227,180,88,.12);display:grid;place-items:center;color:var(--gold);flex:none}
 .rev-fname{font-size:.82rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rev-sz{font-size:.7rem;color:var(--muted-2);font-family:'JetBrains Mono',monospace}
 .conf{font-size:.66rem;padding:2px 8px;border-radius:99px;font-weight:600;white-space:nowrap}
 .conf.hi{background:rgba(74,222,158,.14);color:var(--green)}
+.conf.md{background:rgba(95,209,200,.14);color:var(--teal)}
 .conf.lo{background:rgba(245,185,69,.15);color:var(--amber)}
-.rev-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.rev-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
 .field{display:flex;flex-direction:column;gap:4px}
 .field label{font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2)}
 select,input[type=text],input[type=number],input[type=date],textarea{
   width:100%;background:var(--bg-2);border:1px solid var(--line);color:var(--text);
-  border-radius:8px;padding:8px 10px;font-size:.82rem;font-family:inherit;
-}
+  border-radius:8px;padding:8px 10px;font-size:.82rem;font-family:inherit}
 select:focus,input:focus,textarea:focus{outline:none;border-color:var(--orchid)}
 .rev-actions{display:flex;justify-content:flex-end;gap:8px}
 
-/* buttons */
 .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface-2);
-  color:var(--text);padding:9px 15px;border-radius:9px;font-size:.8rem;font-weight:600;transition:.15s}
+  color:var(--text);padding:9px 15px;border-radius:9px;font-size:.8rem;font-weight:600;transition:.15s;font-family:inherit;cursor:pointer}
 .btn:hover{border-color:var(--orchid);background:rgba(123,75,201,.16)}
 .btn.gold{background:linear-gradient(150deg,var(--gold),var(--gold-soft));color:#33240a;border:none}
 .btn.gold:hover{filter:brightness(1.07)}
@@ -178,20 +167,21 @@ select:focus,input:focus,textarea:focus{outline:none;border-color:var(--orchid)}
 .btn.sm{padding:6px 11px;font-size:.74rem}
 .btn.danger:hover{border-color:var(--red);color:var(--red);background:rgba(255,107,122,.08)}
 .btn.icon{padding:7px;width:34px;height:34px;justify-content:center}
+.btn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
 
-/* filters */
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
 .toolbar .search{flex:1;min-width:180px;position:relative}
 .toolbar .search input{padding-left:34px}
 .toolbar .search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--muted-2)}
-.toolbar select{width:auto;min-width:120px}
+.toolbar select,.toolbar input[type=date]{width:auto;min-width:130px}
 
-/* tree */
 .sup-group{border:1px solid var(--line-soft);border-radius:var(--r);margin-bottom:12px;overflow:hidden;background:var(--surface)}
 .sup-head{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;user-select:none}
 .sup-head:hover{background:var(--surface-2)}
-.sup-badge{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;font-family:'Cormorant Garamond',serif;font-weight:700;font-size:1.1rem;color:#23103a;background:linear-gradient(150deg,var(--orchid),var(--orchid-bright));flex:none}
+.sup-badge{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;font-family:'Cormorant Garamond',serif;font-weight:700;font-size:1.05rem;color:#23103a;background:linear-gradient(150deg,var(--orchid),var(--orchid-bright));flex:none}
+.sup-badge.svc{background:linear-gradient(150deg,var(--teal),#7ed8d1)}
 .sup-name{font-weight:600;font-size:.94rem}
+.sup-cat{font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);margin-left:6px}
 .sup-sub{font-size:.72rem;color:var(--muted)}
 .sup-count{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--gold-soft)}
 .chev{transition:transform .2s;color:var(--muted)}
@@ -210,7 +200,6 @@ select:focus,input:focus,textarea:focus{outline:none;border-color:var(--orchid)}
 .doc-meta .dd{font-size:.68rem;color:var(--muted-2);font-family:'JetBrains Mono',monospace}
 .doc-month{font-size:.68rem;color:var(--orchid);background:rgba(181,126,220,.1);padding:2px 8px;border-radius:6px;white-space:nowrap}
 
-/* petty cash */
 .pc-balance{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:22px}
 .pc-card{background:linear-gradient(160deg,var(--surface),var(--bg-2));border:1px solid var(--line-soft);border-radius:var(--r);padding:18px}
 .pc-card .lab{font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
@@ -225,7 +214,7 @@ select:focus,input:focus,textarea:focus{outline:none;border-color:var(--orchid)}
 .progress > div{height:100%;background:linear-gradient(90deg,var(--gold),var(--amber));border-radius:99px;transition:width .5s}
 
 table.pc{width:100%;border-collapse:collapse;font-size:.8rem}
-table.pc thead th{text-align:left;color:var(--muted-2);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:10px 10px;border-bottom:1px solid var(--line-soft);position:sticky;top:0;background:var(--surface)}
+table.pc thead th{text-align:left;color:var(--muted-2);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:10px 10px;border-bottom:1px solid var(--line-soft);position:sticky;top:0;background:var(--surface);z-index:1}
 table.pc tbody td{padding:10px 10px;border-bottom:1px solid var(--line-soft);vertical-align:top}
 table.pc tbody tr:hover{background:var(--surface-2)}
 table.pc .c-cost{font-family:'JetBrains Mono',monospace;color:var(--gold-soft);text-align:right;white-space:nowrap}
@@ -234,15 +223,14 @@ table.pc .c-inv{font-family:'JetBrains Mono',monospace;color:var(--muted-2);font
 .pc-vendor{font-weight:500}
 .pc-purpose{color:var(--muted);font-size:.74rem;margin-top:2px}
 .pc-tbl-wrap{max-height:560px;overflow:auto;border:1px solid var(--line-soft);border-radius:var(--r)}
+.pc-rcpt-link{font-size:.66rem;color:var(--gold);text-decoration:none;padding:1px 6px;border:1px solid rgba(227,180,88,.3);border-radius:4px;margin-left:6px}
 
-/* empty */
 .empty{text-align:center;padding:46px 20px;color:var(--muted)}
 .empty .e-ic{width:54px;height:54px;color:var(--line);margin:0 auto 12px}
 .empty .e-ic svg{width:100%;height:100%}
 .empty h4{font-family:'Cormorant Garamond',serif;font-size:1.3rem;color:var(--text);margin:0 0 5px;font-weight:600}
 .empty p{font-size:.84rem;margin:0}
 
-/* modal */
 .modal-bg{position:fixed;inset:0;background:rgba(8,4,14,.78);backdrop-filter:blur(4px);z-index:60;display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto}
 .modal-bg.show{display:flex}
 .modal{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);width:100%;max-width:560px;box-shadow:var(--shadow);animation:pop .25s}
@@ -254,13 +242,13 @@ table.pc .c-inv{font-family:'JetBrains Mono',monospace;color:var(--muted-2);font
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .form-grid .full{grid-column:1/-1}
 
-/* toast */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);z-index:80;
   background:var(--surface-2);border:1px solid var(--line);color:var(--text);padding:12px 18px;border-radius:11px;
-  font-size:.84rem;box-shadow:var(--shadow);opacity:0;transition:.3s;display:flex;align-items:center;gap:9px}
+  font-size:.84rem;box-shadow:var(--shadow);opacity:0;transition:.3s;display:flex;align-items:center;gap:9px;max-width:90vw}
 #toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 #toast .t-dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
 #toast.err .t-dot{background:var(--red)}
+#toast.info .t-dot{background:var(--teal)}
 
 .pdf-overlay{position:fixed;inset:0;background:rgba(8,4,14,.9);z-index:70;display:none;flex-direction:column;padding:18px}
 .pdf-overlay.show{display:flex}
@@ -269,14 +257,21 @@ table.pc .c-inv{font-family:'JetBrains Mono',monospace;color:var(--muted-2);font
 .pdf-frame{flex:1;border:1px solid var(--line);border-radius:var(--r);background:#fff;overflow:hidden}
 .pdf-frame iframe{width:100%;height:100%;border:none}
 
-@media(max-width:640px){
-  .marquee-inner{padding:12px 16px}
-  main{padding:20px 16px 80px}
-  nav.tabs{padding:0 16px}
+/* Loading spinner */
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--orchid);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media(max-width:680px){
+  .marquee-inner{padding:12px 14px;gap:10px}
+  main{padding:20px 14px 80px}
+  nav.tabs{padding:0 14px}
   .form-grid{grid-template-columns:1fr}
-  .brand-txt .l1{font-size:1.25rem}
+  .brand-txt .l1{font-size:1.2rem}
+  .branch-btn{padding:6px 12px;font-size:.72rem}
+  .sync-pill{display:none}
 }
-.foot{max-width:1240px;margin:30px auto 0;padding:18px 22px;border-top:1px solid var(--line-soft);color:var(--muted-2);font-size:.74rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.foot{max-width:1280px;margin:30px auto 0;padding:18px 22px;border-top:1px solid var(--line-soft);
+  color:var(--muted-2);font-size:.74rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
 .foot .sky{color:var(--orchid)}
 </style>
 </head>
@@ -294,8 +289,11 @@ table.pc .c-inv{font-family:'JetBrains Mono',monospace;color:var(--muted-2);font
       </div>
     </div>
     <div class="spacer"></div>
-    <div class="branch-pill"><span class="sync-dot"></span> Branch · <b>Unaizah</b></div>
-    <div class="branch-pill" id="storagePill"><span id="syncIco" style="font-size:.75rem">☁</span> <span id="syncLbl">Connecting…</span></div>
+    <div class="branch-switch" id="branchSwitch">
+      <button class="branch-btn active" data-branch="unaizah"><span class="dot"></span> Unaizah</button>
+      <button class="branch-btn" data-branch="mithnab"><span class="dot"></span> Mithnab</button>
+    </div>
+    <div class="sync-pill" id="syncPill"><span class="d"></span> <span id="syncLbl">Connecting…</span></div>
   </div>
   <nav class="tabs" id="tabs">
     <button class="tab active" data-view="dash">⬡ Dashboard</button>
@@ -305,10 +303,10 @@ table.pc .c-inv{font-family:'JetBrains Mono',monospace;color:var(--muted-2);font
 </header>
 
 <main>
-  <!-- ===================== DASHBOARD ===================== -->
+  <!-- DASHBOARD -->
   <section class="view active" id="view-dash">
-    <h2 class="section">Vault overview</h2>
-    <p class="section-sub">Everything filed for the Unaizah branch — at a glance.</p>
+    <h2 class="section" id="dashTitle">Vault overview · Unaizah</h2>
+    <p class="section-sub">Everything filed for this branch — at a glance.</p>
     <div class="kpi-row" id="kpiRow"></div>
 
     <div class="panel">
@@ -328,16 +326,16 @@ table.pc .c-inv{font-family:'JetBrains Mono',monospace;color:var(--muted-2);font
     </div>
   </section>
 
-  <!-- ===================== INVOICES ===================== -->
+  <!-- INVOICES -->
   <section class="view" id="view-inv">
     <h2 class="section">Invoices &amp; Suppliers</h2>
-    <p class="section-sub">Drop a PDF — the engine reads it, detects the supplier &amp; date, and files it for you.</p>
+    <p class="section-sub">Drop any PDF — the engine reads the ZATCA QR, OCR fallback, and files it automatically.</p>
 
     <div class="panel">
       <div class="drop" id="drop">
         <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4m0 0l-4 4m4-4l4 4"/><path d="M4 14v4a2 2 0 002 2h12a2 2 0 002-2v-4"/></svg>
         <div class="big">Drop invoice PDFs here</div>
-        <div class="sm">or click to browse — multiple files supported · scanned PDFs welcome</div>
+        <div class="sm">or click to browse — ZATCA QR codes are read automatically · scanned PDFs welcome</div>
         <input type="file" id="fileInput" accept="application/pdf" multiple hidden />
       </div>
       <div class="review" id="reviewArea"></div>
@@ -346,21 +344,24 @@ table.pc .c-inv{font-family:'JetBrains Mono',monospace;color:var(--muted-2);font
     <div class="toolbar">
       <div class="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-        <input type="text" id="invSearch" placeholder="Search file name, supplier…" />
+        <input type="text" id="invSearch" placeholder="Search file, supplier, vendor…" />
       </div>
+      <select id="fCategory"><option value="">All categories</option><option>Supplier</option><option>Service</option></select>
       <select id="fSupplier"><option value="">All suppliers</option></select>
       <select id="fYear"><option value="">All years</option></select>
       <select id="fType"><option value="">All types</option><option>Invoice</option><option>Timesheet</option><option>Delivery Note</option></select>
-      <button class="btn ghost sm" id="backupBtn">⬇ Backup</button>
+      <input type="date" id="fFrom" title="From date">
+      <input type="date" id="fTo" title="To date">
+      <button class="btn sm" id="downloadFilteredBtn">⬇ Download filtered</button>
     </div>
 
     <div id="treeArea"></div>
   </section>
 
-  <!-- ===================== PETTY CASH ===================== -->
+  <!-- PETTY CASH -->
   <section class="view" id="view-petty">
-    <h2 class="section">Petty Cash</h2>
-    <p class="section-sub">Set the float, log each receipt, and the closing balance keeps itself.</p>
+    <h2 class="section">Petty Cash · Unaizah</h2>
+    <p class="section-sub">Drop a receipt PDF — the engine reads vendor &amp; amount and adds it to the ledger. Petty cash is Unaizah-only.</p>
 
     <div class="pc-balance">
       <div class="pc-card float">
@@ -371,7 +372,7 @@ table.pc .c-inv{font-family:'JetBrains Mono',monospace;color:var(--muted-2);font
       <div class="pc-card spent">
         <div class="lab">Total expenses</div>
         <div class="amt" id="pcSpent">0.00 <small>SAR</small></div>
-        <div class="hint" style="margin-top:8px" id="pcCount">0 receipts logged</div>
+        <div class="hint" style="margin-top:8px" id="pcCount">0 receipts</div>
       </div>
       <div class="pc-card bal pos" id="pcBalCard">
         <div class="lab">Closing balance · cash in hand</div>
@@ -380,21 +381,33 @@ table.pc .c-inv{font-family:'JetBrains Mono',monospace;color:var(--muted-2);font
       </div>
     </div>
 
+    <div class="panel">
+      <div class="drop" id="pcDrop" style="padding:24px 18px">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:38px;height:38px"><path d="M12 16V4m0 0l-4 4m4-4l4 4"/><path d="M4 14v4a2 2 0 002 2h12a2 2 0 002-2v-4"/></svg>
+        <div class="big" style="font-size:1.1rem">Drop a petty-cash receipt PDF</div>
+        <div class="sm">vendor, date, and amount are read from the ZATCA QR · review before saving</div>
+        <input type="file" id="pcFileInput" accept="application/pdf" multiple hidden />
+      </div>
+      <div class="review" id="pcReviewArea"></div>
+    </div>
+
     <div class="toolbar">
       <button class="btn gold" id="addExpBtn">＋ Add expense</button>
       <div class="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
         <input type="text" id="pcSearch" placeholder="Search vendor, purpose, invoice…" />
       </div>
-      <select id="pcMonth"><option value="">All months</option></select>
-      <button class="btn ghost sm" id="pcExport">⬇ Export</button>
+      <input type="date" id="pcFrom" title="From">
+      <input type="date" id="pcTo" title="To">
+      <button class="btn sm" id="pcExport">⬇ Excel</button>
+      <button class="btn sm ghost" id="pcCsv">CSV</button>
     </div>
 
     <div class="pc-tbl-wrap">
       <table class="pc">
         <thead><tr>
           <th style="width:34px">#</th><th>Date</th><th>Invoice no.</th><th>Vendor / type</th>
-          <th style="text-align:right">Cost</th><th style="width:60px"></th>
+          <th style="text-align:right">Cost</th><th style="width:80px"></th>
         </tr></thead>
         <tbody id="pcBody"></tbody>
       </table>
@@ -420,7 +433,7 @@ table.pc .c-inv{font-family:'JetBrains Mono',monospace;color:var(--muted-2);font
         <div class="field full"><label>Purpose</label><textarea id="ePurpose" rows="2" placeholder="What it was for"></textarea></div>
       </div>
     </div>
-    <div class="modal-f"><button class="btn ghost" data-close>Cancel</button><button class="btn gold" id="expSave">Save expense</button></div>
+    <div class="modal-f"><button class="btn ghost" data-close>Cancel</button><button class="btn gold" id="expSave">Save</button></div>
   </div>
 </div>
 
@@ -435,128 +448,201 @@ table.pc .c-inv{font-family:'JetBrains Mono',monospace;color:var(--muted-2);font
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 /* ============================================================
-   STORAGE LAYER — Firebase Firestore + Storage
-   PDFs go to Firebase Storage (unaizah/invoices/<id>.pdf)
-   Metadata + petty cash + settings go to Firestore
-   Offline persistence is enabled — works without internet
+   STATE & CONSTANTS
+   ============================================================ */
+let INVOICES=[], PETTY=[], FLOAT=5000;
+let BRANCH='unaizah';
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+/* Supplier registry — category=Supplier (goods) or Service (recurring services) */
+const SUPPLIERS=[
+  // Suppliers (goods)
+  {name:'Coca Cola',            cat:'Supplier', vat:['300474138200003'], key:['coca','cola','كوكا']},
+  {name:'Golden Fist',          cat:'Supplier', vat:[],                 key:['golden fist','golden','fist','قولدن']},
+  {name:'Fine (Hygienic Paper)',cat:'Supplier', vat:[],                 key:['fine','hygienic','paper','فاين']},
+  {name:'Electricity',          cat:'Supplier', vat:[],                 key:['electricity','utility','كهرب','tax invoice']},
+  {name:'BSF Deposits',         cat:'Supplier', vat:[],                 key:['deposit','bsf','بنك']},
+  // Services (recurring)
+  {name:'AMNCO (Cleaning)',     cat:'Service',  vat:[],                 key:['amnco','أمنكو','تنظيف']},
+  {name:'United Security',      cat:'Service',  vat:['302004889900003'],key:['united security','united','security','حراسة','أمني','أمن']},
+  {name:'Mace Environmental',   cat:'Service',  vat:[],                 key:['mace','pest','environmental','مكافحة','الافات','حشرات']},
+];
+
+/* Petty-cash vendor catalog — vat numbers from ZATCA QR map to clean vendor names */
+const PETTY_VENDOR_MAP={
+  '300057178310003':'Othaim Markets',
+  '300991174100003':'Sama Cleaning Co.',
+  '311268073800003':'United Systems',
+  '313001559100003':'Bait Al-Itqan',
+  '312216855300003':'Al-Sayer Safety Co.',
+  '300575069700003':'Themar Unaizah Trading',
+  '311196242300003':'Sana Al-Kheir',
+  '300050207600003':'SACO',
+  '300779285200003':'Al-Amer Bookshop',
+  '310434353600003':'Dar Al-Qalam Stationery',
+  '300422185700003':'Al-Majarah Stationery',
+  '310914676800003':'Areej Trading Co.',
+  '300914671300003':'Al-Shafi Foodstuff Wh.',
+  '300428301500003':'Khabeer Pest Control Co.',
+  '312136067800003':'Nuhba Java Supermarket',
+  '312777881700003':'Aromatic',
+  '300056289500003':'Jarir Bookstore',
+  '300508296700003':'Altamimi',
+  '300582394200003':'Renad',
+};
+
+const supInitials=n=>{const w=n.replace(/[()]/g,'').split(/\s+/);return (w[0][0]+(w[1]?w[1][0]:'')).toUpperCase()};
+const branchCap=b=>b.charAt(0).toUpperCase()+b.slice(1);
+
+/* ============================================================
+   STORAGE — Firebase (Firestore + Storage)
+   Collections per branch: invoices_<branch>, petty_<branch>, settings_<branch>
    ============================================================ */
 function setSyncStatus(ok,msg){
-  const lbl=document.getElementById('syncLbl'),ic=document.getElementById('syncIco');
-  if(!lbl)return;
+  const p=document.getElementById('syncPill'),lbl=document.getElementById('syncLbl');
+  if(!p)return;
+  p.classList.toggle('warn',!ok);
   lbl.textContent=msg;
-  ic.textContent=ok?'☁':'⚠';
-  ic.style.color=ok?'var(--green)':'var(--amber)';
 }
 
-const DB=(()=>{
-  /* ---------- helpers ---------- */
-  const col=(name)=>_fdb.collection(name);
-  const docRef=(coll,id)=>_fdb.collection(coll).doc(id);
+let _unsubInv=null, _unsubPetty=null;
 
-  /* open — no-op for Firebase (SDK inits in <head>) */
-  const open=async()=>{
-    try{
-      await _fdb.collection('settings').limit(1).get();
+const DB={
+  collName:(store)=>`${store}_${BRANCH}`, // e.g. invoices_unaizah
+  open: async function(){
+    try{ await _fdb.collection('settings_unaizah').limit(1).get();
       setSyncStatus(true,'Firebase · live');
-    }catch(e){setSyncStatus(false,'Firebase · offline');}
-    // listen for real-time updates on invoices
-    _fdb.collection('invoices').onSnapshot(snap=>{
+    }catch(e){setSyncStatus(false,'Offline mode');}
+    this.attachListeners();
+  },
+  attachListeners: function(){
+    if(_unsubInv)_unsubInv();
+    if(_unsubPetty)_unsubPetty();
+    _unsubInv=_fdb.collection(this.collName('invoices')).onSnapshot(snap=>{
       INVOICES=snap.docs.map(d=>({...d.data(),id:d.id}));
-      if(typeof renderAll==='function')renderAll();
+      renderAll();
       setSyncStatus(true,'Firebase · live');
-    },()=>setSyncStatus(false,'Offline mode'));
-    _fdb.collection('petty').onSnapshot(snap=>{
-      PETTY=snap.docs.map(d=>({...d.data(),id:d.id}));
-      if(typeof renderPetty==='function')renderPetty();
-    });
-  };
-
-  /* all — get every document in a Firestore collection */
-  const all=async(store)=>{
-    if(store==='settings')return []; // settings fetched individually
-    const snap=await col(store).get();
+    },e=>{console.error(e);setSyncStatus(false,'Read failed')});
+    // Petty cash only for Unaizah
+    if(BRANCH==='unaizah'){
+      _unsubPetty=_fdb.collection(this.collName('petty')).onSnapshot(snap=>{
+        PETTY=snap.docs.map(d=>({...d.data(),id:d.id}));
+        renderPetty();
+      });
+    }else{
+      PETTY=[]; renderPetty();
+    }
+  },
+  all: async function(store){
+    const snap=await _fdb.collection(this.collName(store)).get();
     return snap.docs.map(d=>({...d.data(),id:d.id}));
-  };
-
-  /* put — upsert a doc; for invoices, also upload blob to Storage */
-  const put=async(store,v)=>{
+  },
+  put: async function(store,v){
     const data={...v};
     if(store==='invoices' && v.blob instanceof File){
       setSyncStatus(false,'Uploading PDF…');
       try{
-        const path=`unaizah/invoices/${v.id}.pdf`;
+        const path=`${BRANCH}/invoices/${v.id}.pdf`;
         const ref=_fst.ref(path);
-        await ref.put(v.blob,{contentType:'application/pdf',customMetadata:{fileName:v.fileName,supplier:v.supplier}});
+        await ref.put(v.blob,{contentType:'application/pdf'});
         data.storagePath=path;
         data.downloadURL=await ref.getDownloadURL();
-        setSyncStatus(true,'PDF uploaded ✓');
+        setSyncStatus(true,'Uploaded ✓');
       }catch(e){setSyncStatus(false,'Upload failed');console.error(e);}
-      delete data.blob; // never store File object in Firestore
+      delete data.blob;
     }
-    if(store==='settings'){
-      await docRef('settings',v.k).set(v);
-    }else{
-      await docRef(store,v.id).set(data);
-    }
-    return data;
-  };
-
-  /* del — delete from Firestore (and Storage for invoices) */
-  const del=async(store,id)=>{
-    if(store==='invoices'){
+    if(store==='petty' && v.blob instanceof File){
       try{
-        const snap=await docRef('invoices',id).get();
+        const path=`unaizah/petty/${v.id}.pdf`;
+        const ref=_fst.ref(path);
+        await ref.put(v.blob,{contentType:'application/pdf'});
+        data.storagePath=path;
+        data.downloadURL=await ref.getDownloadURL();
+      }catch(e){console.error(e);}
+      delete data.blob;
+    }
+    await _fdb.collection(this.collName(store)).doc(v.id||v.k).set(data);
+    return data;
+  },
+  del: async function(store,id){
+    if(store==='invoices'||store==='petty'){
+      try{
+        const snap=await _fdb.collection(this.collName(store)).doc(id).get();
         const path=snap.data()?.storagePath;
         if(path)await _fst.ref(path).delete();
       }catch(e){}
     }
-    await docRef(store,id).delete();
-  };
-
-  /* get — fetch a single doc (used for settings & openPdf) */
-  const get=async(store,id)=>{
-    const key = store==='settings'?id:id;
-    const ref = store==='settings'?docRef('settings',id):docRef(store,id);
-    const snap=await ref.get();
+    await _fdb.collection(this.collName(store)).doc(id).delete();
+  },
+  get: async function(store,id){
+    const snap=await _fdb.collection(this.collName(store)).doc(id).get();
     if(!snap.exists)return null;
     const data={...snap.data(),id:snap.id};
-    /* for invoices: reconstruct a fake blob-URL from Storage download URL */
-    if(store==='invoices' && data.downloadURL){
-      // fetch the file so openPdf can createObjectURL
+    if((store==='invoices'||store==='petty') && data.downloadURL){
       try{
         const resp=await fetch(data.downloadURL);
         const blob=await resp.blob();
-        data.blob=new File([blob],data.fileName,{type:'application/pdf'});
+        data.blob=new File([blob],data.fileName||'document.pdf',{type:'application/pdf'});
       }catch(e){}
     }
     return data;
-  };
-
-  return {open,all,put,del,get};
-})();
-
-/* ---------- state ---------- */
-let INVOICES=[], PETTY=[], FLOAT=5000;
-const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const MONTH_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
-
-/* ---------- supplier registry (drives the smart engine) ---------- */
-const SUPPLIERS=[
-  {name:'AMNCO',                key:['amnco']},
-  {name:'Coca Cola',            key:['coca','cola']},
-  {name:'Golden Fist',          key:['golden fist','golden','fist']},
-  {name:'United Security',      key:['united security','united','security']},
-  {name:'Mace Environmental',   key:['mace','pest','environmental','مكافحة','الافات']},
-  {name:'Fine (Hygienic Paper)',key:['fine','hygienic','paper']},
-  {name:'Electricity',          key:['electricity','utility','كهرب','tax invoice']},
-  {name:'BSF Deposits',         key:['deposit','bsf']},
-];
-const supInitials=n=>{const w=n.replace(/[()]/g,'').split(/\s+/);return (w[0][0]+(w[1]?w[1][0]:'')).toUpperCase()};
+  },
+};
 
 /* ============================================================
-   SMART ENGINE — detect supplier, date, doc-type from a PDF
+   SMART ENGINE — ZATCA QR + filename + text
    ============================================================ */
-async function extractText(file){
+
+/* Parse ZATCA TLV (Tag-Length-Value) from QR code data (base64) */
+function parseZatcaTLV(qrData){
+  try{
+    // QR is base64 encoded
+    const raw = atob(qrData);
+    const bytes = new Uint8Array(raw.length);
+    for(let i=0;i<raw.length;i++) bytes[i]=raw.charCodeAt(i);
+    const tagNames={1:'seller',2:'vat',3:'timestamp',4:'total',5:'vatAmount'};
+    const fields={};
+    let i=0;
+    while(i<bytes.length){
+      if(i+2>bytes.length)break;
+      const tag=bytes[i], len=bytes[i+1];
+      if(i+2+len>bytes.length)break;
+      const valueBytes=bytes.slice(i+2,i+2+len);
+      const value=new TextDecoder('utf-8').decode(valueBytes);
+      if(tagNames[tag]) fields[tagNames[tag]]=value;
+      i+=2+len;
+    }
+    return Object.keys(fields).length?fields:null;
+  }catch(e){return null}
+}
+
+/* Render PDF page to canvas, then scan for QR code */
+async function scanPdfForQR(file){
+  try{
+    const buf=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    const pagesToScan=Math.min(pdf.numPages,3);
+    for(let p=1;p<=pagesToScan;p++){
+      const page=await pdf.getPage(p);
+      // Higher scale = better QR detection
+      const viewport=page.getViewport({scale:2.0});
+      const canvas=document.createElement('canvas');
+      canvas.width=viewport.width;canvas.height=viewport.height;
+      const ctx=canvas.getContext('2d');
+      await page.render({canvasContext:ctx,viewport}).promise;
+      const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
+      const qr=jsQR(imgData.data,imgData.width,imgData.height,{inversionAttempts:'attemptBoth'});
+      if(qr && qr.data){
+        const tlv=parseZatcaTLV(qr.data);
+        if(tlv) return tlv;
+      }
+    }
+  }catch(e){console.warn('QR scan failed',e)}
+  return null;
+}
+
+async function extractPdfText(file){
   try{
     const buf=await file.arrayBuffer();
     const pdf=await pdfjsLib.getDocument({data:buf}).promise;
@@ -570,40 +656,54 @@ async function extractText(file){
     return txt.toLowerCase();
   }catch(e){return ''}
 }
-function detectSupplier(fname,text){
-  const fn=fname.toLowerCase(), tx=text||'';
+
+function detectSupplier(fname,text,vatNumber){
+  const fn=fname.toLowerCase(), tx=(text||'').toLowerCase();
+  // VAT number is the strongest signal — if it matches, we're 100% sure
+  if(vatNumber){
+    for(const s of SUPPLIERS){
+      if(s.vat && s.vat.includes(vatNumber))
+        return {supplier:s.name, category:s.cat, confident:true};
+    }
+  }
   let best=null,score=0;
   for(const s of SUPPLIERS){
     let sc=0;
     for(const k of s.key){
-      if(fn.includes(k))sc+=3;
-      if(tx.includes(k))sc+=1;
+      if(fn.includes(k.toLowerCase()))sc+=3;
+      if(tx.includes(k.toLowerCase()))sc+=1;
     }
-    if(sc>score){score=sc;best=s.name}
+    if(sc>score){score=sc;best=s}
   }
-  return {supplier:best||'Unclassified', confident:score>=3};
+  return {supplier:best?best.name:'Unclassified', category:best?best.cat:'Other', confident:score>=3};
 }
+
 function detectType(fname,text){
   const h=(fname+' '+(text||'')).toLowerCase();
-  if(/time\s*sheet|timesheet/.test(h))return 'Timesheet';
-  if(/delivery|deliver\s*note|أذن|تسليم|اذن/.test(h))return 'Delivery Note';
+  if(/time\s*sheet|timesheet|attendance|att\b|الحضور/.test(h))return 'Timesheet';
+  if(/delivery|deliver\s*note|أذن|تسليم|اذن|diary not/.test(h))return 'Delivery Note';
   return 'Invoice';
 }
+
 function detectDate(fname,text){
   const h=fname+' '+(text||'');
-  const monthMap={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+  const monthMap={jan:0,feb:1,febr:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,sept:8,oct:9,nov:10,dec:11,
+    january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,october:9,november:10,december:11};
   let year=null,mi=null;
-  // 1) month-name + year e.g. Apr2025 / Mar-2026 / OCT 2025
-  let m=h.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s\-_.]*?(20\d{2})/i);
-  if(m){mi=monthMap[m[1].toLowerCase().slice(0,3)];year=+m[2];}
-  // 2) numeric YYYY-M-D  (2026-5-21)
+  // 1) Month NAME + year e.g. "Jan2026" / "Mar 2026" / "OCT-2025"
+  let m=h.match(/(jan(?:uary)?|feb(?:r(?:uary)?)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)[\s\-_.]*?(20\d{2})/i);
+  if(m){mi=monthMap[m[1].toLowerCase()];year=+m[2];}
+  // 2) "MM.YYYY" or "MM-YYYY" or "MM/YYYY" — month number then year only
+  if(year===null){m=h.match(/(?:^|[^\d])(\d{1,2})[\-_.\/]?(20\d{2})(?:[^\d]|$)/);
+    if(m){const mo=+m[1];if(mo>=1&&mo<=12){mi=mo-1;year=+m[2];}}}
+  // 3) "YYYY-M-D" e.g. 2026-5-21
   if(year===null){m=h.match(/(20\d{2})[\-_.\/](\d{1,2})[\-_.\/](\d{1,2})/);
     if(m){year=+m[1];mi=Math.min(11,Math.max(0,(+m[2])-1));}}
-  // 3) numeric D-M-YYYY or M-D-YYYY  (09-04-2026 / 03-28-2026)
+  // 4) "DD-MM-YYYY" or "MM-DD-YYYY" — disambiguate by checking if first num > 12
   if(year===null){m=h.match(/(\d{1,2})[\-_.\/](\d{1,2})[\-_.\/](20\d{2})/);
     if(m){year=+m[3];const a=+m[1],b=+m[2];mi=Math.min(11,Math.max(0,(a>12?b:a)-1));}}
-  // 4) lone month name + lone year anywhere
-  if(mi===null){const mm=h.toLowerCase().match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/);if(mm)mi=monthMap[mm[1]];}
+  // 5) Lone month name
+  if(mi===null){const mm=h.toLowerCase().match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/);if(mm)mi=monthMap[mm[1]];}
   if(year===null){const yy=h.match(/20\d{2}/);if(yy)year=+yy[0];}
   const now=new Date();
   if(year===null)year=now.getFullYear();
@@ -611,8 +711,55 @@ function detectDate(fname,text){
   return {year,monthIndex:mi};
 }
 
+/* Master detection — combines QR (best), filename, and text */
+async function analyzeFile(file){
+  const result={
+    supplier:'Unclassified', category:'Other', docType:'Invoice',
+    year:new Date().getFullYear(), monthIndex:new Date().getMonth(),
+    date:null, amount:null, vatNumber:null, vendorRaw:null,
+    confidence:'lo', source:'filename'
+  };
+  // 1. Try ZATCA QR (most accurate)
+  const qr=await scanPdfForQR(file);
+  if(qr){
+    result.source='zatca';
+    result.confidence='hi';
+    result.vendorRaw=qr.seller||null;
+    result.vatNumber=qr.vat||null;
+    result.amount=qr.total?parseFloat(qr.total):null;
+    if(qr.timestamp){
+      const d=new Date(qr.timestamp);
+      if(!isNaN(d)){
+        result.date=d.toISOString().slice(0,10);
+        result.year=d.getFullYear();
+        result.monthIndex=d.getMonth();
+      }
+    }
+  }
+  // 2. Try filename + text for supplier/type/date
+  const text=await extractPdfText(file);
+  const sup=detectSupplier(file.name,text+' '+(qr?(qr.seller||''):''),result.vatNumber);
+  result.supplier=sup.supplier;
+  result.category=sup.category;
+  if(qr && qr.seller && result.supplier==='Unclassified'){
+    // Use QR seller as a fallback name
+    result.supplier=qr.seller.slice(0,40);
+  }
+  result.docType=detectType(file.name,text);
+  // Only override date from filename if QR didn't provide one
+  if(!result.date){
+    const dt=detectDate(file.name,text);
+    result.year=dt.year;
+    result.monthIndex=dt.monthIndex;
+  }
+  if(result.source==='zatca' && sup.confident) result.confidence='hi';
+  else if(qr) result.confidence='md';
+  else if(sup.confident) result.confidence='md';
+  return result;
+}
+
 /* ============================================================
-   UPLOAD FLOW
+   UPLOAD FLOW — invoices
    ============================================================ */
 const drop=document.getElementById('drop'),fileInput=document.getElementById('fileInput'),reviewArea=document.getElementById('reviewArea');
 drop.onclick=()=>fileInput.click();
@@ -627,26 +774,28 @@ async function handleFiles(list){
   for(const f of files){
     const card=document.createElement('div');card.className='rev-card';
     card.innerHTML=`<div class="rev-top"><div class="fic">▦</div>
-      <div style="min-width:0;flex:1"><div class="rev-fname">${esc(f.name)}</div><div class="rev-sz">${fmtSize(f.size)} · reading…</div></div></div>`;
+      <div style="min-width:0;flex:1"><div class="rev-fname">${esc(f.name)}</div><div class="rev-sz">${fmtSize(f.size)} · <span class="spin"></span> Reading QR &amp; text…</div></div></div>`;
     reviewArea.prepend(card);
-    const text=await extractText(f);
-    const sup=detectSupplier(f.name,text);
-    const dt=detectDate(f.name,text);
-    const type=detectType(f.name,text);
-    buildReviewCard(card,f,sup,dt,type);
+    const r=await analyzeFile(f);
+    buildReviewCard(card,f,r);
   }
 }
-function buildReviewCard(card,file,sup,dt,type){
-  const supOpts=SUPPLIERS.map(s=>`<option ${s.name===sup.supplier?'selected':''}>${s.name}</option>`).join('')+
-    `<option ${sup.supplier==='Unclassified'?'selected':''}>Unclassified</option>`;
-  const yrOpts=[2024,2025,2026,2027].map(y=>`<option ${y===dt.year?'selected':''}>${y}</option>`).join('');
-  const moOpts=MONTH_FULL.map((m,i)=>`<option value="${i}" ${i===dt.monthIndex?'selected':''}>${m}</option>`).join('');
-  const tyOpts=['Invoice','Timesheet','Delivery Note'].map(t=>`<option ${t===type?'selected':''}>${t}</option>`).join('');
+
+function buildReviewCard(card,file,r){
+  const supOpts=SUPPLIERS.map(s=>`<option ${s.name===r.supplier?'selected':''}>${s.name}</option>`).join('')+
+    `<option ${r.supplier==='Unclassified'?'selected':''}>Unclassified</option>`+
+    (SUPPLIERS.find(s=>s.name===r.supplier)?'':`<option selected>${esc(r.supplier)}</option>`);
+  const yrOpts=[2024,2025,2026,2027].map(y=>`<option ${y===r.year?'selected':''}>${y}</option>`).join('');
+  const moOpts=MONTH_FULL.map((m,i)=>`<option value="${i}" ${i===r.monthIndex?'selected':''}>${m}</option>`).join('');
+  const tyOpts=['Invoice','Timesheet','Delivery Note'].map(t=>`<option ${t===r.docType?'selected':''}>${t}</option>`).join('');
+  const confTxt=r.confidence==='hi'?'ZATCA verified':r.confidence==='md'?'Auto-detected':'Please confirm';
+  const confCls=r.confidence==='hi'?'hi':r.confidence==='md'?'md':'lo';
+  const qrInfo=r.source==='zatca'?`<div style="font-size:.7rem;color:var(--teal);margin-top:4px">⚡ ZATCA QR: ${esc(r.vendorRaw||'?')} · ${r.amount?r.amount+' SAR':'?'} · ${r.date||'?'}</div>`:'';
   card.innerHTML=`
     <div class="rev-top">
       <div class="fic">▦</div>
-      <div style="min-width:0;flex:1"><div class="rev-fname">${esc(file.name)}</div><div class="rev-sz">${fmtSize(file.size)}</div></div>
-      <span class="conf ${sup.confident?'hi':'lo'}">${sup.confident?'Auto-detected':'Please confirm'}</span>
+      <div style="min-width:0;flex:1"><div class="rev-fname">${esc(file.name)}</div><div class="rev-sz">${fmtSize(file.size)}</div>${qrInfo}</div>
+      <span class="conf ${confCls}">${confTxt}</span>
     </div>
     <div class="rev-fields">
       <div class="field"><label>Supplier</label><select data-k="supplier">${supOpts}</select></div>
@@ -661,15 +810,85 @@ function buildReviewCard(card,file,sup,dt,type){
   card.querySelector('[data-act="discard"]').onclick=()=>card.remove();
   card.querySelector('[data-act="file"]').onclick=async()=>{
     const g=k=>card.querySelector(`[data-k="${k}"]`).value;
+    const selSup=g('supplier');
+    const cat=(SUPPLIERS.find(s=>s.name===selSup)||{cat:'Other'}).cat;
     const rec={id:'inv_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
-      supplier:g('supplier'),docType:g('type'),year:+g('year'),monthIndex:+g('month'),
+      branch:BRANCH,
+      supplier:selSup,category:cat,docType:g('type'),
+      year:+g('year'),monthIndex:+g('month'),
+      date:r.date||null, amount:r.amount||null, vatNumber:r.vatNumber||null,
       fileName:file.name,size:file.size,uploadedAt:Date.now(),blob:file};
     await DB.put('invoices',rec);
-    INVOICES.push(rec);
     card.style.transition='.3s';card.style.opacity='0';card.style.transform='translateX(20px)';
     setTimeout(()=>card.remove(),300);
     toast(`Filed under ${rec.supplier} · ${MONTHS[rec.monthIndex]} ${rec.year}`);
-    renderAll();
+  };
+}
+
+/* ============================================================
+   UPLOAD FLOW — petty cash receipts (Unaizah only)
+   ============================================================ */
+const pcDrop=document.getElementById('pcDrop'),pcFileInput=document.getElementById('pcFileInput'),pcReviewArea=document.getElementById('pcReviewArea');
+pcDrop.onclick=()=>pcFileInput.click();
+['dragenter','dragover'].forEach(ev=>pcDrop.addEventListener(ev,e=>{e.preventDefault();pcDrop.classList.add('over')}));
+['dragleave','drop'].forEach(ev=>pcDrop.addEventListener(ev,e=>{e.preventDefault();pcDrop.classList.remove('over')}));
+pcDrop.addEventListener('drop',e=>handlePcFiles(e.dataTransfer.files));
+pcFileInput.onchange=e=>handlePcFiles(e.target.files);
+
+async function handlePcFiles(list){
+  if(BRANCH!=='unaizah'){toast('Petty cash is Unaizah-only',true);return}
+  const files=[...list].filter(f=>f.type==='application/pdf'||f.name.toLowerCase().endsWith('.pdf'));
+  if(!files.length){toast('Only PDF files are supported',true);return}
+  for(const f of files){
+    const card=document.createElement('div');card.className='rev-card';
+    card.innerHTML=`<div class="rev-top"><div class="fic">◈</div>
+      <div style="min-width:0;flex:1"><div class="rev-fname">${esc(f.name)}</div><div class="rev-sz">${fmtSize(f.size)} · <span class="spin"></span> Reading receipt…</div></div></div>`;
+    pcReviewArea.prepend(card);
+    const r=await analyzeFile(f);
+    buildPcReviewCard(card,f,r);
+  }
+}
+
+function buildPcReviewCard(card,file,r){
+  // Use vendor map first; if VAT matches, use the clean name. Else use QR seller. Else blank.
+  let vendor='';
+  if(r.vatNumber && PETTY_VENDOR_MAP[r.vatNumber]) vendor=PETTY_VENDOR_MAP[r.vatNumber];
+  else if(r.vendorRaw) vendor=r.vendorRaw.slice(0,60);
+  const date=r.date || new Date().toISOString().slice(0,10);
+  const amount=r.amount || '';
+  const confTxt=r.confidence==='hi'?'ZATCA verified':r.confidence==='md'?'Partial read':'Manual entry';
+  const confCls=r.confidence==='hi'?'hi':r.confidence==='md'?'md':'lo';
+  const qrInfo=r.source==='zatca'?`<div style="font-size:.7rem;color:var(--teal);margin-top:4px">⚡ ZATCA QR matched</div>`:'';
+  card.innerHTML=`
+    <div class="rev-top">
+      <div class="fic">◈</div>
+      <div style="min-width:0;flex:1"><div class="rev-fname">${esc(file.name)}</div><div class="rev-sz">${fmtSize(file.size)}</div>${qrInfo}</div>
+      <span class="conf ${confCls}">${confTxt}</span>
+    </div>
+    <div class="rev-fields">
+      <div class="field"><label>Date</label><input type="date" data-k="date" value="${date}"></div>
+      <div class="field"><label>Cost (SAR)</label><input type="number" step="0.01" data-k="cost" value="${amount}"></div>
+      <div class="field"><label>Vendor</label><input type="text" data-k="vendor" value="${esc(vendor)}"></div>
+      <div class="field"><label>Invoice no.</label><input type="text" data-k="invoice" value=""></div>
+    </div>
+    <div class="field"><label>Purpose</label><input type="text" data-k="purpose" placeholder="What it was for"></div>
+    <div class="rev-actions">
+      <button class="btn ghost sm" data-act="discard">Discard</button>
+      <button class="btn gold sm" data-act="save">✓ Save to ledger</button>
+    </div>`;
+  card.querySelector('[data-act="discard"]').onclick=()=>card.remove();
+  card.querySelector('[data-act="save"]').onclick=async()=>{
+    const g=k=>card.querySelector(`[data-k="${k}"]`).value.trim();
+    const cost=+g('cost');
+    if(!g('date')||!g('vendor')||isNaN(cost)){toast('Date, vendor and cost are required',true);return}
+    const rec={id:'pc_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+      branch:'unaizah', date:g('date'), cost, vendor:g('vendor'),
+      invoice:g('invoice'), purpose:g('purpose'),
+      vatNumber:r.vatNumber||null, blob:file};
+    await DB.put('petty',rec);
+    card.style.transition='.3s';card.style.opacity='0';card.style.transform='translateX(20px)';
+    setTimeout(()=>card.remove(),300);
+    toast(`Logged ${rec.vendor} · ${fmtN(cost)} SAR`);
   };
 }
 
@@ -677,6 +896,7 @@ function buildReviewCard(card,file,sup,dt,type){
    RENDER — dashboard
    ============================================================ */
 function renderDash(){
+  document.getElementById('dashTitle').textContent=`Vault overview · ${branchCap(BRANCH)}`;
   const total=INVOICES.length;
   const supSet=new Set(INVOICES.map(i=>i.supplier));
   const now=new Date(),cm=now.getMonth(),cy=now.getFullYear();
@@ -685,11 +905,10 @@ function renderDash(){
   document.getElementById('kpiRow').innerHTML=`
     ${kpi('Documents filed',total,'gold','across all suppliers')}
     ${kpi('Active suppliers',supSet.size,'orchid','with at least one file')}
-    ${kpi('This month',thisMonth,'','filed in '+MONTHS[cm]+' '+cy)}
+    ${kpi('This month',thisMonth,'teal','filed in '+MONTHS[cm]+' '+cy)}
     ${kpi('Vault size',fmtSize(bytes),'','Firebase Storage')}`;
-  // per-month bars (current + last year span)
   const byMonth={};
-  INVOICES.forEach(i=>{const key=`${i.year}-${i.monthIndex}`;byMonth[key]=(byMonth[key]||0)+1});
+  INVOICES.forEach(i=>{const key=`${i.year}-${String(i.monthIndex).padStart(2,'0')}`;byMonth[key]=(byMonth[key]||0)+1});
   const keys=Object.keys(byMonth).sort();
   const max=Math.max(1,...Object.values(byMonth));
   document.getElementById('monthBars').innerHTML = keys.length? keys.map(k=>{
@@ -724,7 +943,7 @@ function kpi(lab,val,cls,meta){return `<div class="kpi"><div class="lab">${lab}<
 function emptyInline(t){return `<div style="text-align:center;color:var(--muted-2);font-size:.82rem;padding:18px">${t}</div>`}
 
 /* ============================================================
-   RENDER — invoices tree
+   RENDER — invoices tree + filters
    ============================================================ */
 function refreshFilters(){
   const sups=[...new Set(INVOICES.map(i=>i.supplier))].sort();
@@ -738,12 +957,31 @@ function fillSelect(id,first,arr){
   el.innerHTML=`<option value="">${first}</option>`+arr.map(a=>`<option>${a}</option>`).join('');
   if([...el.options].some(o=>o.value==cur))el.value=cur;
 }
-function renderTree(){
+function getFilteredInvoices(){
   const q=document.getElementById('invSearch').value.toLowerCase();
-  const fs=document.getElementById('fSupplier').value,fy=document.getElementById('fYear').value,ft=document.getElementById('fType').value;
-  let list=INVOICES.filter(i=>
-    (!fs||i.supplier===fs)&&(!fy||i.year==fy)&&(!ft||i.docType===ft)&&
-    (!q||i.fileName.toLowerCase().includes(q)||i.supplier.toLowerCase().includes(q)));
+  const fc=document.getElementById('fCategory').value;
+  const fs=document.getElementById('fSupplier').value;
+  const fy=document.getElementById('fYear').value;
+  const ft=document.getElementById('fType').value;
+  const ff=document.getElementById('fFrom').value;
+  const ftt=document.getElementById('fTo').value;
+  return INVOICES.filter(i=>{
+    if(fc && i.category!==fc) return false;
+    if(fs && i.supplier!==fs) return false;
+    if(fy && i.year!=fy) return false;
+    if(ft && i.docType!==ft) return false;
+    if(q && !(i.fileName.toLowerCase().includes(q)||i.supplier.toLowerCase().includes(q))) return false;
+    if(ff || ftt){
+      // Use i.date (ZATCA) if available, else build from year/month/1
+      const iso = i.date || `${i.year}-${String(i.monthIndex+1).padStart(2,'0')}-15`;
+      if(ff && iso < ff) return false;
+      if(ftt && iso > ftt) return false;
+    }
+    return true;
+  });
+}
+function renderTree(){
+  const list=getFilteredInvoices();
   const area=document.getElementById('treeArea');
   if(!list.length){
     area.innerHTML=`<div class="empty"><div class="e-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/></svg></div>
@@ -753,15 +991,17 @@ function renderTree(){
   const bySup={};
   list.forEach(i=>{(bySup[i.supplier]=bySup[i.supplier]||[]).push(i)});
   area.innerHTML=Object.keys(bySup).sort().map(sup=>{
-    const items=bySup[sup].sort((a,b)=> b.year-a.year || b.monthIndex-a.monthIndex);
+    const items=bySup[sup].sort((a,b)=>b.year-a.year || b.monthIndex-a.monthIndex);
+    const cat=items[0].category||'Other';
     const byYear={};items.forEach(i=>{(byYear[i.year]=byYear[i.year]||[]).push(i)});
     const yrsHtml=Object.keys(byYear).sort((a,b)=>b-a).map(y=>{
       const rows=byYear[y].map(i=>{
         const tc=i.docType==='Timesheet'?'tim':i.docType==='Delivery Note'?'del':'inv';
         const tl=i.docType==='Timesheet'?'TS':i.docType==='Delivery Note'?'DN':'IN';
+        const amount=i.amount?`<span style="font-family:JetBrains Mono,monospace;color:var(--gold-soft);font-size:.74rem;margin-left:8px">${fmtN(i.amount)} SAR</span>`:'';
         return `<div class="doc-row" data-id="${i.id}">
           <div class="doc-ic ${tc}">${tl}</div>
-          <div class="doc-meta"><div class="dn">${esc(i.fileName)}</div><div class="dd">${i.docType} · ${fmtSize(i.size)}</div></div>
+          <div class="doc-meta"><div class="dn">${esc(i.fileName)}${amount}</div><div class="dd">${i.docType} · ${fmtSize(i.size)}${i.date?' · '+i.date:''}</div></div>
           <span class="doc-month">${MONTHS[i.monthIndex]}</span>
           <button class="btn icon ghost sm" data-view-pdf="${i.id}" title="Open">↗</button>
           <button class="btn icon ghost sm danger" data-del="${i.id}" title="Delete">✕</button>
@@ -771,8 +1011,8 @@ function renderTree(){
     }).join('');
     return `<div class="sup-group">
       <div class="sup-head" data-toggle>
-        <div class="sup-badge">${supInitials(sup)}</div>
-        <div><div class="sup-name">${esc(sup)}</div><div class="sup-sub">${monthsSpan(items)}</div></div>
+        <div class="sup-badge ${cat==='Service'?'svc':''}">${supInitials(sup)}</div>
+        <div><div class="sup-name">${esc(sup)} <span class="sup-cat">${cat}</span></div><div class="sup-sub">${monthsSpan(items)}</div></div>
         <span class="sup-count">${items.length}</span>
         <span class="chev">›</span>
       </div>
@@ -780,39 +1020,70 @@ function renderTree(){
     </div>`;
   }).join('');
   area.querySelectorAll('[data-toggle]').forEach(h=>h.onclick=()=>h.closest('.sup-group').classList.toggle('open'));
-  area.querySelectorAll('[data-view-pdf]').forEach(b=>b.onclick=e=>{e.stopPropagation();openPdf(b.dataset.viewPdf)});
+  area.querySelectorAll('[data-view-pdf]').forEach(b=>b.onclick=e=>{e.stopPropagation();openPdf('invoices',b.dataset.viewPdf)});
   area.querySelectorAll('[data-del]').forEach(b=>b.onclick=async e=>{e.stopPropagation();
     if(!confirm('Delete this document from the vault?'))return;
-    await DB.del('invoices',b.dataset.del);toast('Document deleted — removed from Firebase');});
+    await DB.del('invoices',b.dataset.del);toast('Document deleted');});
 }
 function monthsSpan(items){
   const ms=[...new Set(items.map(i=>`${MONTHS[i.monthIndex]} ${String(i.year).slice(2)}`))];
   return ms.slice(0,6).join(' · ')+(ms.length>6?` +${ms.length-6}`:'');
 }
-async function openPdf(id){
-  const rec=await DB.get('invoices',id);if(!rec)return;
-  // If blob fetched from Storage, create object URL; otherwise use direct downloadURL
+async function openPdf(store,id){
+  toast('Loading PDF…','info');
+  const rec=await DB.get(store,id);if(!rec){toast('PDF not found',true);return}
   let url;
-  if(rec.blob){url=URL.createObjectURL(rec.blob);}
-  else if(rec.downloadURL){url=rec.downloadURL;}
-  else{toast('PDF not available',true);return;}
-  document.getElementById('pdfName').textContent=rec.fileName;
+  if(rec.blob)url=URL.createObjectURL(rec.blob);
+  else if(rec.downloadURL)url=rec.downloadURL;
+  else{toast('PDF not available',true);return}
+  document.getElementById('pdfName').textContent=rec.fileName||'document.pdf';
   document.getElementById('pdfFrame').src=url;
   document.getElementById('pdfOverlay').classList.add('show');
-  document.getElementById('pdfDownload').onclick=()=>{const a=document.createElement('a');a.href=url;a.download=rec.fileName;a.click()};
+  document.getElementById('pdfDownload').onclick=()=>{const a=document.createElement('a');a.href=url;a.download=rec.fileName||'document.pdf';a.click()};
 }
 document.getElementById('pdfClose').onclick=()=>{document.getElementById('pdfOverlay').classList.remove('show');document.getElementById('pdfFrame').src=''};
-['invSearch','fSupplier','fYear','fType'].forEach(id=>document.getElementById(id).addEventListener('input',renderTree));
+['invSearch','fCategory','fSupplier','fYear','fType','fFrom','fTo'].forEach(id=>document.getElementById(id).addEventListener('input',renderTree));
+
+/* Download filtered invoices as a metadata CSV + open download links list */
+document.getElementById('downloadFilteredBtn').onclick=()=>{
+  const list=getFilteredInvoices();
+  if(!list.length){toast('No invoices match the filter',true);return}
+  const rows=[['Supplier','Category','Document Type','Year','Month','Date','Amount (SAR)','VAT Number','File Name','Download URL']];
+  list.forEach(i=>rows.push([i.supplier,i.category||'',i.docType,i.year,MONTHS[i.monthIndex],i.date||'',i.amount||'',i.vatNumber||'',i.fileName,i.downloadURL||'']));
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:24},{wch:11},{wch:14},{wch:7},{wch:7},{wch:12},{wch:12},{wch:17},{wch:40},{wch:60}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Invoices');
+  const fname=`NC_${branchCap(BRANCH)}_Invoices_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb,fname);
+  toast(`Exported ${list.length} invoices · ${fname}`);
+};
 
 /* ============================================================
    RENDER — petty cash
    ============================================================ */
-function renderPetty(){
+function getFilteredPetty(){
   const q=document.getElementById('pcSearch').value.toLowerCase();
-  const fm=document.getElementById('pcMonth').value;
-  let list=PETTY.filter(p=>(!fm||p.date.slice(0,7)===fm)&&
-    (!q||(p.vendor+p.purpose+p.invoice).toLowerCase().includes(q)));
-  list.sort((a,b)=>a.date.localeCompare(b.date));
+  const from=document.getElementById('pcFrom').value;
+  const to=document.getElementById('pcTo').value;
+  return PETTY.filter(p=>{
+    if(from && p.date<from) return false;
+    if(to && p.date>to) return false;
+    if(q && !((p.vendor+p.purpose+p.invoice).toLowerCase().includes(q))) return false;
+    return true;
+  }).sort((a,b)=>a.date.localeCompare(b.date));
+}
+function renderPetty(){
+  const pcTab=document.querySelector('[data-view="petty"]');
+  if(pcTab) pcTab.classList.toggle('disabled', BRANCH!=='unaizah');
+  if(BRANCH!=='unaizah'){
+    document.getElementById('pcBody').innerHTML=`<tr><td colspan="6"><div class="empty"><h4>Petty cash is Unaizah-only</h4><p>Switch to the Unaizah branch to use this section.</p></div></td></tr>`;
+    document.getElementById('pcSpent').innerHTML='— <small>SAR</small>';
+    document.getElementById('pcBalance').innerHTML='— <small>SAR</small>';
+    document.getElementById('pcCount').textContent='—';
+    return;
+  }
+  const list=getFilteredPetty();
   const spent=PETTY.reduce((a,p)=>a+(+p.cost||0),0);
   const bal=FLOAT-spent;
   document.getElementById('pcSpent').innerHTML=fmtN(spent)+' <small>SAR</small>';
@@ -820,38 +1091,34 @@ function renderPetty(){
   document.getElementById('pcCount').textContent=PETTY.length+' receipts logged';
   const balCard=document.getElementById('pcBalCard');balCard.classList.toggle('pos',bal>=0);balCard.classList.toggle('neg',bal<0);
   document.getElementById('pcProgress').style.width=Math.min(100,Math.max(0,spent/FLOAT*100))+'%';
-  // month filter options
-  const months=[...new Set(PETTY.map(p=>p.date.slice(0,7)))].sort();
-  const sel=document.getElementById('pcMonth'),cur=sel.value;
-  sel.innerHTML='<option value="">All months</option>'+months.map(m=>{
-    const [y,mo]=m.split('-');return `<option value="${m}">${MONTH_FULL[+mo-1]} ${y}</option>`}).join('');
-  if([...sel.options].some(o=>o.value===cur))sel.value=cur;
-  // rows
   const body=document.getElementById('pcBody');
-  if(!list.length){body.innerHTML=`<tr><td colspan="6"><div class="empty" style="padding:30px"><h4>No receipts</h4><p>Add an expense to start the ledger.</p></div></td></tr>`;return}
+  if(!list.length){body.innerHTML=`<tr><td colspan="6"><div class="empty" style="padding:30px"><h4>${PETTY.length?'No matches':'No receipts'}</h4><p>${PETTY.length?'Clear filters to see all.':'Drop a receipt PDF or click Add expense.'}</p></div></td></tr>`;return}
   body.innerHTML=list.map((p,idx)=>`<tr>
     <td class="c-inv">${idx+1}</td>
     <td class="c-date">${p.date}</td>
     <td class="c-inv">${esc(p.invoice||'—')}</td>
-    <td><div class="pc-vendor">${esc(p.vendor)}</div>${p.purpose?`<div class="pc-purpose">${esc(p.purpose)}</div>`:''}</td>
+    <td><div class="pc-vendor">${esc(p.vendor)}${p.downloadURL?`<a href="#" class="pc-rcpt-link" data-rcpt="${p.id}">PDF</a>`:''}</div>${p.purpose?`<div class="pc-purpose">${esc(p.purpose)}</div>`:''}</td>
     <td class="c-cost">${fmtN(+p.cost)}</td>
     <td><div style="display:flex;gap:4px;justify-content:flex-end">
-      <button class="btn icon ghost sm" data-edit="${p.id}">✎</button>
-      <button class="btn icon ghost sm danger" data-delp="${p.id}">✕</button></div></td>
+      <button class="btn icon ghost sm" data-edit="${p.id}" title="Edit">✎</button>
+      <button class="btn icon ghost sm danger" data-delp="${p.id}" title="Delete">✕</button></div></td>
   </tr>`).join('');
   body.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openExp(b.dataset.edit));
   body.querySelectorAll('[data-delp]').forEach(b=>b.onclick=async()=>{
     if(!confirm('Delete this expense?'))return;
-    await DB.del('petty',b.dataset.delp);toast('Expense removed from Firebase');});
+    await DB.del('petty',b.dataset.delp);toast('Expense removed');});
+  body.querySelectorAll('[data-rcpt]').forEach(a=>a.onclick=e=>{e.preventDefault();openPdf('petty',a.dataset.rcpt)});
 }
-['pcSearch','pcMonth'].forEach(id=>document.getElementById(id).addEventListener('input',renderPetty));
+['pcSearch','pcFrom','pcTo'].forEach(id=>document.getElementById(id).addEventListener('input',renderPetty));
 const floatInput=document.getElementById('floatInput');
-floatInput.addEventListener('change',async()=>{FLOAT=+floatInput.value||0;await DB.put('settings',{k:'float',v:FLOAT});renderPetty();toast('Float updated')});
+floatInput.addEventListener('change',async()=>{FLOAT=+floatInput.value||0;
+  await DB.put('settings',{id:'float',k:'float',v:FLOAT});renderPetty();toast('Float updated')});
 
 /* expense modal */
 const expModal=document.getElementById('expModal');let editingId=null;
 document.getElementById('addExpBtn').onclick=()=>openExp(null);
 function openExp(id){
+  if(BRANCH!=='unaizah'){toast('Petty cash is Unaizah-only',true);return}
   editingId=id;
   document.getElementById('expTitle').textContent=id?'Edit expense':'Add expense';
   const p=id?PETTY.find(x=>x.id===id):null;
@@ -870,28 +1137,62 @@ document.getElementById('expSave').onclick=async()=>{
   const vendor=document.getElementById('eVendor').value.trim();
   if(!date||!vendor||isNaN(cost)){toast('Date, vendor and cost are required',true);return}
   const rec={id:editingId||'pc_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
-    date,cost,vendor,invoice:document.getElementById('eInv').value.trim(),purpose:document.getElementById('ePurpose').value.trim()};
+    branch:'unaizah',date,cost,vendor,invoice:document.getElementById('eInv').value.trim(),purpose:document.getElementById('ePurpose').value.trim()};
+  // preserve existing storage refs if editing
+  if(editingId){const existing=PETTY.find(x=>x.id===editingId);if(existing){rec.downloadURL=existing.downloadURL;rec.storagePath=existing.storagePath;rec.vatNumber=existing.vatNumber}}
   await DB.put('petty',rec);
-  if(editingId){const i=PETTY.findIndex(x=>x.id===editingId);PETTY[i]=rec}else PETTY.push(rec);
-  expModal.classList.remove('show');renderPetty();toast(editingId?'Expense updated':'Expense added');
+  expModal.classList.remove('show');toast(editingId?'Expense updated':'Expense added');
+};
+
+/* Export petty cash */
+document.getElementById('pcExport').onclick=()=>{
+  const list=getFilteredPetty();
+  if(!list.length){toast('Nothing to export',true);return}
+  const rows=[['S.No','Date','Invoice Number','Expense Type / Vendor','Cost (SAR)','Purpose']];
+  list.forEach((p,i)=>rows.push([i+1,p.date,p.invoice||'',p.vendor,+p.cost,p.purpose||'']));
+  const totalSpent=list.reduce((a,p)=>a+(+p.cost||0),0);
+  rows.push([],['','','','Total Expenses',totalSpent.toFixed(2),''],
+                ['','','','Float',FLOAT.toFixed(2),''],
+                ['','','','Closing Balance',(FLOAT-totalSpent).toFixed(2),'']);
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:6},{wch:12},{wch:20},{wch:30},{wch:14},{wch:60}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Petty Cash');
+  const range = (document.getElementById('pcFrom').value||document.getElementById('pcTo').value)?'_filtered':'';
+  const fname=`NC_Unaizah_PettyCash${range}_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb,fname);
+  toast(`Exported ${list.length} receipts · ${fname}`);
+};
+document.getElementById('pcCsv').onclick=()=>{
+  const list=getFilteredPetty();
+  if(!list.length){toast('Nothing to export',true);return}
+  const rows=[['S.No','Date','Invoice','Vendor','Cost','Purpose']];
+  list.forEach((p,i)=>rows.push([i+1,p.date,p.invoice||'',p.vendor,p.cost,p.purpose||'']));
+  const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  downloadBlob(new Blob([csv],{type:'text/csv'}),`NC_Unaizah_PettyCash_${new Date().toISOString().slice(0,10)}.csv`);
+  toast('CSV exported');
 };
 
 /* ============================================================
-   BACKUP / EXPORT
+   BRANCH SWITCHING
    ============================================================ */
-document.getElementById('pcExport').onclick=()=>{
-  const rows=[['S.No','Date','Invoice Number','Expense Type','Cost (SAR)','Purpose']];
-  PETTY.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach((p,i)=>rows.push([i+1,p.date,p.invoice,p.vendor,p.cost,p.purpose]));
-  const spent=PETTY.reduce((a,p)=>a+(+p.cost||0),0);
-  rows.push([],['','','','Total Expenses',spent.toFixed(2)],['','','','Float',FLOAT.toFixed(2)],['','','','Closing Balance',(FLOAT-spent).toFixed(2)]);
-  const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
-  downloadBlob(new Blob([csv],{type:'text/csv'}),'NC_Unaizah_PettyCash.csv');toast('Petty cash exported');
-};
-document.getElementById('backupBtn').onclick=()=>{
-  const meta=INVOICES.map(({blob,...m})=>m);
-  downloadBlob(new Blob([JSON.stringify({invoices:meta,petty:PETTY,float:FLOAT,exported:new Date().toISOString()},null,2)],{type:'application/json'}),'noir_vault_backup.json');
-  toast('Metadata backup downloaded');
-};
+document.getElementById('branchSwitch').querySelectorAll('.branch-btn').forEach(b=>b.onclick=async()=>{
+  if(b.classList.contains('active'))return;
+  document.querySelectorAll('.branch-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  BRANCH=b.dataset.branch;
+  toast(`Switched to ${branchCap(BRANCH)}`,'info');
+  // Re-attach Firestore listeners for new branch
+  DB.attachListeners();
+  // Load float for new branch (unaizah only)
+  if(BRANCH==='unaizah'){
+    try{
+      const f=await DB.get('settings','float');
+      FLOAT=f&&f.v!=null?f.v:5000;
+    }catch(e){FLOAT=5000}
+    floatInput.value=FLOAT;
+  }
+});
 
 /* ============================================================
    HELPERS
@@ -901,10 +1202,15 @@ function fmtSize(b){if(!b)return '0 KB';const u=['B','KB','MB','GB'];let i=0;whi
 function fmtN(n){return (n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function downloadBlob(b,name){const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)}
 let toastT;
-function toast(msg,err){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;t.classList.toggle('err',!!err);t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600)}
+function toast(msg,type){const t=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;
+  t.classList.remove('err','info');
+  if(type===true||type==='err')t.classList.add('err');
+  else if(type==='info')t.classList.add('info');
+  t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2800)}
 
 /* tabs */
 document.getElementById('tabs').querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  if(t.classList.contains('disabled'))return;
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');document.getElementById('view-'+t.dataset.view).classList.add('active');
@@ -916,40 +1222,36 @@ function renderAll(){renderDash();refreshFilters();renderTree();renderPetty()}
    BOOT
    ============================================================ */
 (async function init(){
-  // DB.open() registers Firestore real-time listeners (invoices + petty)
-  // Those listeners will push data and call renderAll() automatically.
-  // Here we just: check seeded flag, seed petty cash on first run, set float.
   await DB.open();
-  // Brief initial render while listeners connect
   renderAll();
+  // Load float for Unaizah
   try{
-    const fset=await DB.get('settings','float');
-    const seeded=await DB.get('settings','seeded');
-    if(!seeded){
-      // First run — write the June petty-cash statement to Firestore
-      const batch=_fdb.batch();
-      for(const p of PETTY_SEED){
-        const id='pc_seed_'+Math.random().toString(36).slice(2,8);
-        batch.set(_fdb.collection('petty').doc(id),{...p,id});
-      }
-      await batch.commit();
-      await DB.put('settings',{k:'float',v:5000});
-      await DB.put('settings',{k:'seeded',v:1});
-      FLOAT=5000;
-      toast('Petty cash statement loaded into Firebase ✓');
-    }else{
-      FLOAT=fset&&fset.v!=null?fset.v:5000;
-    }
-  }catch(e){
-    // offline — use local defaults
-    FLOAT=5000;
-    setSyncStatus(false,'Offline — changes queued');
-  }
+    const f=await DB.get('settings','float');
+    FLOAT=f&&f.v!=null?f.v:5000;
+  }catch(e){FLOAT=5000}
   floatInput.value=FLOAT;
-  renderPetty();
+  // First-run seed: check if Unaizah has any petty entries; if empty, seed from PETTY_SEED
+  setTimeout(async()=>{
+    if(BRANCH!=='unaizah')return;
+    const seeded=await DB.get('settings','seeded').catch(()=>null);
+    if(seeded)return;
+    const existing=await DB.all('petty').catch(()=>[]);
+    if(existing.length>0){await DB.put('settings',{id:'seeded',k:'seeded',v:1});return}
+    if(!PETTY_SEED||!PETTY_SEED.length)return;
+    toast('Loading historical petty-cash entries…','info');
+    const batch=_fdb.batch();
+    for(const p of PETTY_SEED){
+      const id='pc_seed_'+Math.random().toString(36).slice(2,8);
+      batch.set(_fdb.collection('petty_unaizah').doc(id),{...p,id,branch:'unaizah'});
+    }
+    await batch.commit();
+    await DB.put('settings',{id:'float',k:'float',v:5000});
+    await DB.put('settings',{id:'seeded',k:'seeded',v:1});
+    toast('Historical entries loaded ✓');
+  },2500);
 })();
 
-/* ---- seeded petty cash data (your uploaded statement) ---- */
+/* ---- seeded petty cash data (your historical statement) ---- */
 const PETTY_SEED=/*PETTY_SEED*/[{"date": "2026-04-02", "invoice": "169-5071-102-82", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-04-02", "invoice": "169-5071-102-132", "vendor": "Othaim Markets", "cost": 10.0, "purpose": "Berain bottled water 12 L — staff drinking water (welfare expense)"}, {"date": "2026-04-03", "invoice": "67416", "vendor": "Sama Cleaning Co.", "cost": 55.2, "purpose": "Foks heavy-duty refuse sacks 5LK × 2 — janitorial supplies"}, {"date": "2026-04-05", "invoice": "169-5074-105-161", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-04-05", "invoice": "4846", "vendor": "United Systems", "cost": 400.0, "purpose": "HP toner cartridges W2210A/W2211A/W2212A/W2213A — office printing consumables"}, {"date": "2026-04-08", "invoice": "16559", "vendor": "Themar Unaizah Trading", "cost": 32.0, "purpose": "Tania bottled water 18 L × 4 — staff drinking water (welfare expense)"}, {"date": "2026-04-09", "invoice": "169-5078-103-126", "vendor": "Othaim Markets", "cost": 35.99, "purpose": "Afia Corn-Plus Omega cooking oil 2.9 L — F&B raw material (popcorn/fryer line)"}, {"date": "2026-04-09", "invoice": "13540", "vendor": "Bait Al-Itqan", "cost": 10.0, "purpose": "Abu Jamal rust-remover spray — maintenance & janitorial supplies"}, {"date": "2026-04-10", "invoice": "169-5079-102-82", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-04-10", "invoice": "169-5079-105-48", "vendor": "Othaim Markets", "cost": 107.97, "purpose": "Afia Corn-Plus Omega cooking oil 2.9 L × 3 — F&B raw material (popcorn/fryer line)"}, {"date": "2026-04-10", "invoice": "68319", "vendor": "Sama Cleaning Co.", "cost": 41.4, "purpose": "Hobby carpet shampoo 3 L × 2 — facility deep-cleaning supplies"}, {"date": "2026-04-12", "invoice": "0005-806", "vendor": "Al-Sayer Safety Co.", "cost": 255.0, "purpose": "Annual fire-extinguisher inspection (Civil Defence compliance) — regulatory fees"}, {"date": "2026-04-14", "invoice": "169-5083-103-16", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-04-16", "invoice": "169-5085-103-156", "vendor": "Othaim Markets", "cost": 10.0, "purpose": "Berain bottled water 12 L — slush-machine operating consumable"}, {"date": "2026-04-17", "invoice": "169-5085-102-222", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-04-17", "invoice": "169-5086-103-47", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-04-21", "invoice": "267131375166", "vendor": "Sana Al-Kheir", "cost": 32.02, "purpose": "Moba (cleaning replacement cloths) × 4 — janitorial supplies"}, {"date": "2026-04-21", "invoice": "111333462", "vendor": "SACO", "cost": 89.7, "purpose": "Storage boxes 3-ply 620×580×580 mm × 6 — office storage equipment"}, {"date": "2026-04-22", "invoice": "9143", "vendor": "Al-Amer Bookshop", "cost": 17.01, "purpose": "Banks clear liquid glue 50 g + Fine coloured cardboard 100×70 — office stationery"}, {"date": "2026-04-22", "invoice": "69818", "vendor": "Sama Cleaning Co.", "cost": 48.3, "purpose": "Hobby carpet shampoo 3 L + Foks heavy-duty refuse sacks — janitorial supplies"}, {"date": "2026-04-22", "invoice": "22191", "vendor": "Dar Al-Qalam Stationery", "cost": 9.2, "purpose": "Permanent marker pens × 8 — office stationery"}, {"date": "2026-04-23", "invoice": "9181", "vendor": "Al-Amer Bookshop", "cost": 4.0, "purpose": "Cardboard display sheet RQ-20177 — operations consumables"}, {"date": "2026-04-24", "invoice": "9201", "vendor": "Al-Amer Bookshop", "cost": 13.0, "purpose": "Dunya display cardboard sheet, violet — operations consumables"}, {"date": "2026-04-24", "invoice": "169-5093-102-43", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-04-26", "invoice": "100075557", "vendor": "Al-Majarah Stationery", "cost": 4.0, "purpose": "Assorted stationery items — office supplies"}, {"date": "2026-04-26", "invoice": "300009712", "vendor": "Al-Majarah Stationery", "cost": 14.0, "purpose": "A4 black-and-white photocopying × 14 sheets — office printing"}, {"date": "2026-04-27", "invoice": "70446", "vendor": "Sama Cleaning Co.", "cost": 80.5, "purpose": "Hobby Life 30 L plastic storage boxes × 2 — office storage equipment"}, {"date": "2026-04-27", "invoice": "9376", "vendor": "Al-Amer Bookshop", "cost": 28.0, "purpose": "Pens × 2, Dico self-adhesive velvet 2.5 m, Prima binding roll (violet) — office stationery"}, {"date": "2026-04-27", "invoice": "169-5096-104-153", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-04-27", "invoice": "266035111759", "vendor": "Areej Trading Co.", "cost": 35.98, "purpose": "Decorative photo frame 23035 × 3 — facility furnishing"}, {"date": "2026-04-27", "invoice": "2610042037234", "vendor": "Areej Trading Co.", "cost": 53.0, "purpose": "Wooden display shelves 23340 & 23360 — facility furnishing"}, {"date": "2026-04-28", "invoice": "70649", "vendor": "Sama Cleaning Co.", "cost": 11.5, "purpose": "Loyal general air-freshener 750 ml × 2 — facility ambience"}, {"date": "2026-04-28", "invoice": "169-5097-102-93", "vendor": "Othaim Markets", "cost": 9.98, "purpose": "Net plastic-rim paper cups 50 pc + Happy paper cups 9 oz 50 pc — concession pantry"}, {"date": "2026-05-01", "invoice": "169-5100-103-156", "vendor": "Othaim Markets", "cost": 10.0, "purpose": "Berain bottled water 12 L — staff drinking water (welfare expense)"}, {"date": "2026-05-01", "invoice": "169-5100-103-157", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-05-02", "invoice": "71309", "vendor": "Sama Cleaning Co.", "cost": 119.9, "purpose": "Foks refuse sacks + 10-gal garbage bags + Athir 250 ml air-freshener — janitorial supplies"}, {"date": "2026-05-02", "invoice": "39712", "vendor": "Al-Shafi Foodstuff Wh.", "cost": 32.0, "purpose": "Tania bottled water × 4 — staff drinking water (welfare expense)"}, {"date": "2026-05-03", "invoice": "71434", "vendor": "Sama Cleaning Co.", "cost": 42.0, "purpose": "Athir surface freshener 250 ml × 4 — facility ambience"}, {"date": "2026-05-03", "invoice": "169-5102-103-37", "vendor": "Othaim Markets", "cost": 11.99, "purpose": "Evian bottled water 200 ml — staff drinking water (welfare expense)"}, {"date": "2026-05-04", "invoice": "1214", "vendor": "Khabeer Pest Control Co.", "cost": 40.02, "purpose": "Adhesive insect-trap strips × 4 — pest-management consumables"}, {"date": "2026-05-05", "invoice": "169-5104-103-12", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-05-09", "invoice": "169-5108-102-118", "vendor": "Othaim Markets", "cost": 34.97, "purpose": "Oska & Aquafina 330 ml + Berain 12 L + Happy 9 oz paper cups — pantry/welfare"}, {"date": "2026-05-09", "invoice": "100848372", "vendor": "Tanaseq Al-Anwar", "cost": 12.0, "purpose": "Marline German 1/2\"×1/2\" angle valve — maintenance & plumbing"}, {"date": "2026-05-10", "invoice": "169-5109-102-158", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-05-12", "invoice": "169-5111-102-257", "vendor": "Othaim Markets", "cost": 15.99, "purpose": "Crystal sunflower cooking oil 1.5 L — F&B raw material (popcorn/fryer line)"}, {"date": "2026-05-12", "invoice": "169-5111-102-121", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — samoli bread rolls (F&B raw material, concession stand)"}, {"date": "2026-05-14", "invoice": "42256", "vendor": "Nuhba Java Supermarket", "cost": 6.0, "purpose": "Civic batteries × 2 — operations consumables"}, {"date": "2026-05-14", "invoice": "72843", "vendor": "Sama Cleaning Co.", "cost": 20.7, "purpose": "Cinester centre air-freshener + 250 ml refresher spray — facility ambience"}, {"date": "2026-05-14", "invoice": "42297", "vendor": "Nuhba Java Supermarket", "cost": 24.0, "purpose": "Civic batteries × 8 — operations consumables"}, {"date": "2026-05-15", "invoice": "39866", "vendor": "Al-Shafi Foodstuff Wh.", "cost": 32.0, "purpose": "Tania bottled water × 4 — staff drinking water (welfare expense)"}, {"date": "2026-05-15", "invoice": "169-5114-105-23", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-05-19", "invoice": "169-5118-103-37", "vendor": "Othaim Markets", "cost": 10.0, "purpose": "Happy paper cups 9 oz × 2 — concession pantry"}, {"date": "2026-05-20", "invoice": "73589", "vendor": "Sama Cleaning Co.", "cost": 204.7, "purpose": "Janitorial bundle: refuse sacks, cups, naphthalene, tissues, soap, carpet shampoo, tea cups"}, {"date": "2026-05-20", "invoice": "50000-005-0015", "vendor": "Aromatic", "cost": 299.0, "purpose": "Assorted fragrance oils & perfume blends (6 lines) — facility ambience"}, {"date": "2026-05-20", "invoice": "9885", "vendor": "Jarir Bookstore", "cost": 19.0, "purpose": "Disney Pixar Toy Story 4 tin set — promotional / display merchandise"}, {"date": "2026-05-22", "invoice": "169-5121-103023", "vendor": "Othaim Markets", "cost": 58.47, "purpose": "Ketchup & mustard (hot-dog condiments) — F&B raw material (concession stand)"}, {"date": "2026-05-26", "invoice": "2000095316", "vendor": "Renad", "cost": 248.5, "purpose": "Assorted Eid sweets & confectionery — staff & guest hospitality"}, {"date": "2026-05-26", "invoice": "467", "vendor": "Ajwaa AlRiydah", "cost": 175.0, "purpose": "Pending — original invoice not provided; vendor & purpose require verification"}, {"date": "2026-05-26", "invoice": "169-5125-102-245", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — samoli bread rolls (F&B raw material, concession stand)"}, {"date": "2026-05-28", "invoice": "202605281900023010", "vendor": "Altamimi", "cost": 209.6, "purpose": "Assorted Eid sweets & confectionery — staff & guest hospitality"}, {"date": "2026-05-28", "invoice": "169-5127-10147", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-05-29", "invoice": "169-5128-103-39", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — hot dog buns (F&B raw material, concession stand)"}, {"date": "2026-05-29", "invoice": "169-5128-103-37", "vendor": "Othaim Markets", "cost": 10.0, "purpose": "Concession pantry consumable (bottled water / paper cups) — confirm against receipt"}, {"date": "2026-05-29", "invoice": "169-5128-103-38", "vendor": "Othaim Markets", "cost": 6.53, "purpose": "Concession pantry / sundry consumable — confirm against receipt"}, {"date": "2026-06-01", "invoice": "169-5131-105-18", "vendor": "Othaim Markets", "cost": 1.99, "purpose": "Bakery — samoli bread rolls (F&B raw material, concession stand)"}, {"date": "2026-06-02", "invoice": "169-5132-103-14", "vendor": "Othaim Markets", "cost": 15.99, "purpose": "Lusine brioche sandwich bread + Hani beef hot dogs — F&B raw material (concession stand)"}, {"date": "2026-06-02", "invoice": "169-5132-103-37", "vendor": "Othaim Markets", "cost": 9.95, "purpose": "Berain bottled water 1.5 L — staff drinking water (welfare expense)"}, {"date": "2026-06-03", "invoice": "75438", "vendor": "Sama Cleaning Co.", "cost": 59.8, "purpose": "Foks heavy-duty refuse sacks 5LK × 2 — janitorial supplies"}, {"date": "2026-06-03", "invoice": "75440", "vendor": "Sama Cleaning Co.", "cost": 11.5, "purpose": "Saver scouring sponges 3+6 + steel-wool scourers 3+6 — janitorial supplies"}]/*END_SEED*/;
 </script>
 </body>
